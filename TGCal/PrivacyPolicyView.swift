@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct PrivacyPolicyView: View {
-    private let lastUpdated = "March 6, 2026"
-
     var body: some View {
         ZStack {
             TGBackgroundView()
@@ -10,99 +8,82 @@ struct PrivacyPolicyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("TGCal Privacy Policy")
+                        Text("Privacy Policy")
                             .font(.title2.weight(.bold))
-                        Text("Last updated: \(lastUpdated)")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
-                    .tgFrostedCard(cornerRadius: 18, verticalPadding: 12)
+                    .padding(.horizontal, 16)
 
-                    policySection(
-                        title: "Overview",
-                        paragraphs: [
-                            "TGCal helps users import roster PDFs, manage flight details, estimate earnings, prepare destination briefings, and add flights to Apple Calendar."
-                        ]
-                    )
+                    VStack(alignment: .leading, spacing: 0) {
+                        policySection(
+                            title: "Overview",
+                            paragraphs: [
+                                "TGCal helps you import roster PDFs, manage flight details, and add flights to Apple Calendar. Most processing is done on your device."
+                            ]
+                        )
 
-                    policySection(
-                        title: "Data We Process",
-                        bullets: [
-                            "Roster PDF parsing is performed on-device in the app.",
-                            "The app stores imported roster month data on your device.",
-                            "Briefing notes you add are stored on your device.",
-                            "TGCal does not require account creation."
-                        ]
-                    )
+                        subtleDivider
 
-                    policySection(
-                        title: "Calendar Access",
-                        paragraphs: [
-                            "TGCal requests Calendar permission only when you use calendar features."
-                        ],
-                        bullets: [
-                            "TGCal adds events only after you explicitly choose to add them.",
-                            "When adding to an existing calendar, TGCal may remove TGCal-imported events for the selected month and then add updated flights for that same month.",
-                            "TGCal does not intentionally remove your non-TGCal personal events."
-                        ]
-                    )
+                        policySection(
+                            title: "Data Stored on Your Device",
+                            bullets: [
+                                "Imported roster month data.",
+                                "Briefing notes you add.",
+                                "No account is required."
+                            ]
+                        )
 
-                    policySection(
-                        title: "Network Services",
-                        paragraphs: [
-                            "Some features use network requests to third-party services:"
-                        ],
-                        bullets: [
-                            "Open-Meteo for destination weather and arrival conditions (latitude/longitude and time-related query parameters).",
-                            "Exchange rate API for THB currency conversion rates.",
-                            "Aviationstack for live flight operational data such as aircraft and gate details (for example flight code, route, and service date).",
-                            "TGCal does not run advertising SDKs and does not sell personal data."
-                        ]
-                    )
+                        subtleDivider
 
-                    policySection(
-                        title: "Data Storage and Retention",
-                        bullets: [
-                            "App data is stored locally on your device unless explicitly written to your Apple Calendar via your action.",
-                            "Calendar events added by TGCal are stored in your selected calendar account according to Apple Calendar behavior.",
-                            "You can remove app data by deleting the app and can remove calendar entries from Calendar at any time."
-                        ]
-                    )
+                        policySection(
+                            title: "Calendar Access",
+                            paragraphs: [
+                                "TGCal requests Calendar permission only when you use calendar features."
+                            ],
+                            bullets: [
+                                "TGCal adds events only after you explicitly choose to add them.",
+                                "When updating an existing calendar, TGCal may remove and re-add TGCal-created events for the selected month."
+                            ]
+                        )
 
-                    policySection(
-                        title: "Security Note",
-                        paragraphs: [
-                            "TGCal is designed to minimize data collection and process as much as possible on-device. No method of transmission or storage is guaranteed to be 100% secure."
-                        ]
-                    )
+                        subtleDivider
 
-                    policySection(
-                        title: "Children's Privacy",
-                        paragraphs: [
-                            "TGCal is not directed to children under 13 and does not knowingly collect personal information from children."
-                        ]
-                    )
+                        policySection(
+                            title: "Online Services",
+                            paragraphs: [
+                                "Some features call third-party services:"
+                            ],
+                            bullets: [
+                                "Open-Meteo for weather.",
+                                "Exchange-rate API for THB conversion.",
+                                "Aviationstack for flight details such as aircraft and gate."
+                            ]
+                        )
 
-                    policySection(
-                        title: "Contact",
-                        paragraphs: [
-                            "For privacy questions, contact tgcal.app@gmail.com."
-                        ]
-                    )
+                        subtleDivider
 
-                    policySection(
-                        title: "Policy Changes",
-                        paragraphs: [
-                            "This policy may be updated from time to time. The \"Last updated\" date at the top indicates the latest revision."
-                        ]
+                        policySection(
+                            title: "Contact",
+                            paragraphs: [
+                                "For privacy questions, contact tgcal.app@gmail.com."
+                            ]
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(TGTheme.cardFill)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(TGTheme.cardStroke, lineWidth: 1.1)
+                            )
+                            .shadow(color: TGTheme.cardShadow, radius: 12, x: 0, y: 8)
                     )
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
                 .padding(.bottom, 20)
             }
         }
-        .navigationTitle("Privacy Policy")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -131,7 +112,12 @@ struct PrivacyPolicyView: View {
                 }
             }
         }
-        .tgFrostedCard(cornerRadius: 18, verticalPadding: 12)
+        .padding(.vertical, 12)
+    }
+
+    private var subtleDivider: some View {
+        Rectangle()
+            .fill(TGTheme.insetStroke.opacity(0.55))
+            .frame(height: 1)
     }
 }
-

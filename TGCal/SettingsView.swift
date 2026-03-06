@@ -15,25 +15,26 @@ struct SettingsView: View {
                             VStack(spacing: 0) {
                                 Button {
                                     isShowingPrivacyPolicy = true
-                            } label: {
-                                settingsRow(
-                                    title: "Privacy Policy"
-                                )
-                            }
-                            .buttonStyle(.plain)
+                                } label: {
+                                    settingsRow(
+                                        title: "Privacy Policy"
+                                    )
+                                }
+                                .buttonStyle(.plain)
 
                                 Divider()
+                                    .overlay(TGTheme.insetStroke.opacity(0.55))
 
                                 Button {
                                     if let url = URL(string: "mailto:tgcal.app@gmail.com?subject=TGCal%20Support") {
                                         openURL(url)
                                     }
-                            } label: {
-                                settingsRow(
-                                    title: "Contact Support"
-                                )
-                            }
-                            .buttonStyle(.plain)
+                                } label: {
+                                    settingsRow(
+                                        title: "Contact Support"
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
                             .tgFrostedCard(cornerRadius: 18, verticalPadding: 8)
                             .padding(.vertical, 2)
@@ -82,6 +83,6 @@ struct SettingsView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 11)
     }
 }
