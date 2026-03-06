@@ -1,47 +1,37 @@
 import SwiftUI
 
-enum RootTab: Hashable {
+enum Tab: Hashable {
     case overview
     case roster
-    case earnings
     case settings
 }
 
 struct RootTabView: View {
     @EnvironmentObject private var store: TGCalStore
-    @State private var selectedTab: RootTab = .overview
+    @State private var selectedTab: Tab = .overview
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            OverviewView {
-                selectedTab = .roster
-            }
-            .environmentObject(store)
-            .tabItem {
-                Label("Overview", systemImage: "house")
-            }
-            .tag(RootTab.overview)
+            OverviewView(selectedTab: $selectedTab)
+                .environmentObject(store)
+                .tabItem {
+                    Label("Overview", systemImage: "house")
+                }
+                .tag(Tab.overview)
 
             ContentView()
                 .environmentObject(store)
                 .tabItem {
-                    Label("Roster", systemImage: "airplane")
+                    Label("Flights", systemImage: "airplane")
                 }
-                .tag(RootTab.roster)
-
-            EarningsView()
-                .environmentObject(store)
-                .tabItem {
-                    Label("Earnings", systemImage: "chart.bar")
-                }
-                .tag(RootTab.earnings)
+                .tag(Tab.roster)
 
             SettingsView()
                 .environmentObject(store)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
-                .tag(RootTab.settings)
+                .tag(Tab.settings)
         }
     }
 }

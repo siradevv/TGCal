@@ -221,11 +221,6 @@ struct FlightEventDraft: Identifiable, Hashable {
         if origin.isEmpty { origin = "BKK" }
         if destination.isEmpty { destination = origin }
 
-        // User preference: only keep arrival time for returns to BKK.
-        if destination != "BKK" {
-            hasArrivalTime = false
-        }
-
         let calendar = Calendar.roster
         serviceDate = calendar.startOfDay(for: serviceDate)
 
@@ -247,9 +242,15 @@ struct FlightEventDraft: Identifiable, Hashable {
 }
 
 struct CalendarInsertResult {
+    let removedCount: Int
     let addedCount: Int
     let skippedDuplicateCount: Int
     let failedCount: Int
+}
+
+struct CalendarMonthScope {
+    let year: Int
+    let month: Int
 }
 
 extension Calendar {

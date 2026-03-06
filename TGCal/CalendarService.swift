@@ -22,6 +22,7 @@ enum CalendarServiceError: LocalizedError {
 @MainActor
 final class CalendarService: ObservableObject {
     private let maxCalendarNameLength = 60
+    private let tgCalImportedNote = "Imported by TGCal"
 
     private let eventStore = EKEventStore()
     private var hasPresentedSettingsAlert = false
@@ -115,25 +116,22 @@ final class CalendarService: ObservableObject {
         }
     }
 
-    func addEvents(from drafts: [FlightEventDraft], to selectedCalendarIdentifier: String?) throws -> CalendarInsertResult {
+    func addEvents(
+        from drafts: [FlightEventDraft],
+        to selectedCalendarIdentifier: String?,
+        replaceTGCalEventsInMonth monthScope: CalendarMonthScope? = nil
+    ) throws -> CalendarInsertResult {
         guard hasCalendarReadWriteAccess else {
             presentSettingsRedirectAlertIfNeeded()
             throw CalendarServiceError.accessDenied
         }
 
-        let writable = eventStore
-            .calendars(for: .event)
-            .filter { $0.allowsContentModifications }
-
-        let defaultCalendar = eventStore.defaultCalendarForNewEvents
-        let targetCalendar = writable.first { $0.calendarIdentifier == selectedCalendarIdentifier }
-            ?? (defaultCalendar?.allowsContentModifications == true ? defaultCalendar : nil)
-            ?? writable.first
-
+        let targetCalendar = resolvedTargetCalendar(selectedCalendarIdentifier: selectedCalendarIdentifier)
         guard let targetCalendar else {
             throw CalendarServiceError.noWritableCalendar
         }
 
+        var removed = 0
         var added = 0
         var skippedDuplicates = 0
         var failed = 0
@@ -141,57 +139,71 @@ final class CalendarService: ObservableObject {
         var importedKeys = Set<String>()
         var dayCache: [Date: [EKEvent]] = [:]
 
-        for originalDraft in drafts {
-            var draft = originalDraft
-            draft.normalize()
-
-            let dayStart = Calendar.roster.startOfDay(for: draft.departure)
-            let dayEnd = Calendar.roster.date(byAdding: .day, value: 1, to: dayStart) ?? draft.departure.addingTimeInterval(24 * 3600)
-
-            if dayCache[dayStart] == nil {
-                let predicate = eventStore.predicateForEvents(withStart: dayStart, end: dayEnd, calendars: [targetCalendar])
-                dayCache[dayStart] = eventStore.events(matching: predicate)
+        do {
+            if let monthScope {
+                removed = try removeImportedTGCalEvents(in: monthScope, from: targetCalendar)
             }
 
-            let title = draft.title
-            let key = duplicateKey(title: title, startDate: draft.departure)
+            for originalDraft in drafts {
+                var draft = originalDraft
+                draft.normalize()
 
-            if importedKeys.contains(key) {
-                skippedDuplicates += 1
-                continue
+                let dayStart = Calendar.roster.startOfDay(for: draft.departure)
+                let dayEnd = Calendar.roster.date(byAdding: .day, value: 1, to: dayStart) ?? draft.departure.addingTimeInterval(24 * 3600)
+
+                if dayCache[dayStart] == nil {
+                    let predicate = eventStore.predicateForEvents(withStart: dayStart, end: dayEnd, calendars: [targetCalendar])
+                    dayCache[dayStart] = eventStore.events(matching: predicate)
+                }
+
+                let title = draft.title
+                let key = duplicateKey(title: title, startDate: draft.departure)
+
+                if importedKeys.contains(key) {
+                    skippedDuplicates += 1
+                    continue
+                }
+
+                if let sameDayEvents = dayCache[dayStart],
+                   hasDuplicate(
+                    title: title,
+                    startDate: draft.departure,
+                    events: sameDayEvents,
+                    ignoreImportedTGCal: monthScope != nil
+                   ) {
+                    skippedDuplicates += 1
+                    continue
+                }
+
+                let event = EKEvent(eventStore: eventStore)
+                event.calendar = targetCalendar
+                event.title = title
+                event.startDate = draft.departure
+                event.endDate = draft.arrival
+                event.timeZone = rosterTimeZone
+                event.location = draft.destination
+                event.notes = tgCalImportedNote
+
+                do {
+                    try eventStore.save(event, span: .thisEvent, commit: false)
+                    dayCache[dayStart, default: []].append(event)
+                    importedKeys.insert(key)
+                    added += 1
+                } catch {
+                    failed += 1
+                }
             }
 
-            if let sameDayEvents = dayCache[dayStart],
-               hasDuplicate(title: title, startDate: draft.departure, events: sameDayEvents) {
-                skippedDuplicates += 1
-                continue
+            if removed > 0 || added > 0 {
+                try eventStore.commit()
             }
-
-            let event = EKEvent(eventStore: eventStore)
-            event.calendar = targetCalendar
-            event.title = title
-            event.startDate = draft.departure
-            event.endDate = draft.arrival
-            event.timeZone = rosterTimeZone
-            event.location = draft.destination
-
-            event.notes = "Imported by TGCal"
-
-            do {
-                try eventStore.save(event, span: .thisEvent, commit: false)
-                dayCache[dayStart, default: []].append(event)
-                importedKeys.insert(key)
-                added += 1
-            } catch {
-                failed += 1
-            }
-        }
-
-        if added > 0 {
-            try eventStore.commit()
+        } catch {
+            eventStore.reset()
+            throw error
         }
 
         return CalendarInsertResult(
+            removedCount: removed,
             addedCount: added,
             skippedDuplicateCount: skippedDuplicates,
             failedCount: failed
@@ -203,8 +215,16 @@ final class CalendarService: ObservableObject {
         return status == .fullAccess || status == .writeOnly
     }
 
-    private func hasDuplicate(title: String, startDate: Date, events: [EKEvent]) -> Bool {
+    private func hasDuplicate(
+        title: String,
+        startDate: Date,
+        events: [EKEvent],
+        ignoreImportedTGCal: Bool = false
+    ) -> Bool {
         for event in events {
+            if ignoreImportedTGCal, isImportedByTGCal(event) {
+                continue
+            }
             guard event.title == title else { continue }
             if abs(event.startDate.timeIntervalSince(startDate)) <= 5 * 60 {
                 return true
@@ -216,6 +236,59 @@ final class CalendarService: ObservableObject {
     private func duplicateKey(title: String, startDate: Date) -> String {
         let roundedWindow = Int(startDate.timeIntervalSince1970 / (5 * 60))
         return "\(title)|\(roundedWindow)"
+    }
+
+    private func removeImportedTGCalEvents(in monthScope: CalendarMonthScope, from calendar: EKCalendar) throws -> Int {
+        guard let monthInterval = dateInterval(for: monthScope) else { return 0 }
+
+        let predicate = eventStore.predicateForEvents(
+            withStart: monthInterval.start,
+            end: monthInterval.end,
+            calendars: [calendar]
+        )
+
+        let existingEvents = eventStore.events(matching: predicate)
+        var removedCount = 0
+
+        for event in existingEvents where isImportedByTGCal(event) {
+            try eventStore.remove(event, span: .thisEvent, commit: false)
+            removedCount += 1
+        }
+
+        return removedCount
+    }
+
+    private func dateInterval(for monthScope: CalendarMonthScope) -> DateInterval? {
+        var components = DateComponents()
+        components.calendar = Calendar.roster
+        components.timeZone = rosterTimeZone
+        components.year = monthScope.year
+        components.month = monthScope.month
+        components.day = 1
+
+        guard let start = Calendar.roster.date(from: components),
+              let end = Calendar.roster.date(byAdding: .month, value: 1, to: start) else {
+            return nil
+        }
+
+        return DateInterval(start: start, end: end)
+    }
+
+    private func isImportedByTGCal(_ event: EKEvent) -> Bool {
+        (event.notes ?? "").contains(tgCalImportedNote)
+    }
+
+    private func resolvedTargetCalendar(selectedCalendarIdentifier: String?) -> EKCalendar? {
+        let writable = eventStore
+            .calendars(for: .event)
+            .filter { $0.allowsContentModifications }
+
+        let defaultCalendar = eventStore.defaultCalendarForNewEvents
+        let targetCalendar = writable.first { $0.calendarIdentifier == selectedCalendarIdentifier }
+            ?? (defaultCalendar?.allowsContentModifications == true ? defaultCalendar : nil)
+            ?? writable.first
+
+        return targetCalendar
     }
 
     private func preferredCalendarSource() -> EKSource? {

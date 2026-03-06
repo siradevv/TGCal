@@ -10,32 +10,18 @@ struct EarningsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                backgroundGradient
-                    .ignoresSafeArea()
+                TGBackgroundView()
 
                 List {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Earnings")
-                                        .font(.largeTitle.weight(.semibold))
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Earnings")
+                                    .font(.largeTitle.weight(.semibold))
 
-                                    Text(store.activeMonth == nil ? "No roster loaded" : activeMonthTitle)
-                                        .font(.headline.weight(.semibold))
-                                        .foregroundStyle(store.activeMonth == nil ? .secondary : .primary)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: "chart.bar.fill")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(themeIndigo)
-                                    .padding(10)
-                                    .background(
-                                        Circle()
-                                            .fill(themeIndigo.opacity(0.14))
-                                    )
+                                Text(store.activeMonth == nil ? "No roster loaded" : activeMonthTitle)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(store.activeMonth == nil ? .secondary : .primary)
                             }
 
                             Picker("Season", selection: $selectedSeason) {
@@ -45,8 +31,8 @@ struct EarningsView: View {
                             }
                             .pickerStyle(.segmented)
                         }
-                        .tgEarningsCard()
-                        .padding(.vertical, 2)
+                        .tgEarningsCard(cornerRadius: 20, verticalPadding: 16)
+                        .padding(.vertical, 0)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
@@ -57,7 +43,7 @@ struct EarningsView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .tgEarningsCard(cornerRadius: 14, verticalPadding: 12)
-                                .padding(.vertical, 2)
+                                .padding(.vertical, 0)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                         } footer: {
@@ -69,16 +55,14 @@ struct EarningsView: View {
                     if let result = earningsResult {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Estimated Total Earnings")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(themeIndigo)
+                                TGSectionHeader(title: "Estimated Total Earnings")
                                 Text(formatTHB(result.totalTHB))
                                     .font(.title2.weight(.bold))
                                     .monospacedDigit()
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .tgEarningsCard()
-                            .padding(.vertical, 2)
+                            .padding(.vertical, 0)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
@@ -88,34 +72,39 @@ struct EarningsView: View {
                                 Text("No numeric flights found for this month.")
                                     .foregroundStyle(.secondary)
                                     .tgEarningsCard(cornerRadius: 14, verticalPadding: 12)
-                                    .padding(.vertical, 2)
+                                    .padding(.vertical, 0)
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                             } else {
-                                ForEach(result.lineItems) { item in
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 3) {
+                                VStack(spacing: 0) {
+                                    ForEach(result.lineItems.indices, id: \.self) { index in
+                                        let item = result.lineItems[index]
+
+                                        HStack(spacing: 12) {
                                             Text("TG \(item.flightNumber)")
                                                 .font(.headline.weight(.semibold))
-                                            Text("\(item.count) × \(formatTHB(item.ppb ?? 0))")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.secondary)
+
+                                            Spacer()
+
+                                            Text(formatTHB(item.subtotal))
+                                                .font(.headline.weight(.semibold))
+                                                .monospacedDigit()
                                         }
+                                        .padding(.vertical, 10)
 
-                                        Spacer()
-
-                                        Text(formatTHB(item.subtotal))
-                                            .font(.title3.weight(.bold))
-                                            .monospacedDigit()
+                                        if index < result.lineItems.count - 1 {
+                                            Divider()
+                                        }
                                     }
-                                    .tgEarningsCard(cornerRadius: 16, verticalPadding: 12)
-                                    .padding(.vertical, 2)
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
                                 }
+                                .tgEarningsCard(cornerRadius: 14, verticalPadding: 6)
+                                .padding(.vertical, 0)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                             }
                         } header: {
-                            sectionHeader("Flight Breakdown", systemImage: "airplane.departure")
+                            TGSectionHeader(title: "Flight Breakdown", systemImage: "airplane.departure")
+                                .textCase(nil)
                         }
 
                         if result.missingFlights.isEmpty == false {
@@ -128,13 +117,14 @@ struct EarningsView: View {
                                         Text("x\(row.count)")
                                             .foregroundStyle(.secondary)
                                     }
-                                    .tgEarningsCard(cornerRadius: 14, verticalPadding: 12)
-                                    .padding(.vertical, 2)
+                                    .tgEarningsCard(cornerRadius: 14, verticalPadding: 10)
+                                    .padding(.vertical, 0)
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                                 }
                             } header: {
-                                sectionHeader("Missing PPB", systemImage: "exclamationmark.triangle")
+                                TGSectionHeader(title: "Missing PPB", systemImage: "exclamationmark.triangle")
+                                    .textCase(nil)
                             } footer: {
                                 Text("These flights were counted as ฿0.")
                                     .textCase(nil)
@@ -143,9 +133,10 @@ struct EarningsView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .listSectionSpacing(.compact)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
-                .tint(themeIndigo)
+                .tint(TGTheme.indigo)
             }
             .task {
                 loadRateTablesIfNeeded()
@@ -215,30 +206,6 @@ struct EarningsView: View {
                 return lhs.0 < rhs.0
             }
     }
-
-    private var themeIndigo: Color {
-        Color(red: 0.42, green: 0.50, blue: 0.90)
-    }
-
-    private var backgroundGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.92, green: 0.94, blue: 1.0),
-                Color(red: 0.90, green: 0.97, blue: 0.98),
-                Color(red: 0.96, green: 0.91, blue: 0.98)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    @ViewBuilder
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(themeIndigo)
-            .textCase(nil)
-    }
 }
 
 private struct EarningsCardModifier: ViewModifier {
@@ -256,7 +223,7 @@ private struct EarningsCardModifier: ViewModifier {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .stroke(Color.white.opacity(0.95), lineWidth: 1.1)
                     )
-                    .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 12)
+                    .shadow(color: Color.black.opacity(0.05), radius: 14, x: 0, y: 8)
             )
     }
 }
