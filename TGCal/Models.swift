@@ -220,6 +220,9 @@ struct FlightEventDraft: Identifiable, Hashable {
 
         if origin.isEmpty { origin = "BKK" }
         if destination.isEmpty { destination = origin }
+        if destination != "BKK" {
+            hasArrivalTime = false
+        }
 
         let calendar = Calendar.roster
         serviceDate = calendar.startOfDay(for: serviceDate)

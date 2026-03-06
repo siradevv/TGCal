@@ -8,42 +8,55 @@ struct SettingsView: View {
             ZStack {
                 TGBackgroundView()
 
-                List {
-                    Section {
-                        Button {
-                            if let url = URL(string: "https://tgcalapp.github.io/privacy-policy.html") {
-                                openURL(url)
+                VStack(spacing: 0) {
+                    List {
+                        Section {
+                            Button {
+                                if let url = URL(string: "https://tgcalapp.github.io/privacy-policy.html") {
+                                    openURL(url)
+                                }
+                            } label: {
+                                settingsRow(
+                                    title: "Privacy Policy",
+                                    subtitle: "Read how TGCal handles your data"
+                                )
                             }
-                        } label: {
-                            settingsRow(
-                                title: "Privacy Policy",
-                                subtitle: "Read how TGCal handles your data"
-                            )
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
 
-                        Button {
-                            if let url = URL(string: "mailto:tgcal.app@gmail.com?subject=TGCal%20Support") {
-                                openURL(url)
+                            Button {
+                                if let url = URL(string: "mailto:tgcal.app@gmail.com?subject=TGCal%20Support") {
+                                    openURL(url)
+                                }
+                            } label: {
+                                settingsRow(
+                                    title: "Contact Support",
+                                    subtitle: "Send feedback or report an issue"
+                                )
                             }
-                        } label: {
-                            settingsRow(
-                                title: "Contact Support",
-                                subtitle: "Send feedback or report an issue"
-                            )
+                            .buttonStyle(.plain)
+                        } header: {
+                            TGSectionHeader(title: "Support", systemImage: "questionmark.circle")
+                                .textCase(nil)
                         }
-                        .buttonStyle(.plain)
-                    } header: {
-                        TGSectionHeader(title: "Support", systemImage: "questionmark.circle")
-                            .textCase(nil)
                     }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+
+                    Text(appVersionBuildText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 8)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
             }
             .navigationTitle("Settings")
         }
+    }
+
+    private var appVersionBuildText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
+        return "Version \(shortVersion) (\(build))"
     }
 
     private func settingsRow(title: String, subtitle: String) -> some View {

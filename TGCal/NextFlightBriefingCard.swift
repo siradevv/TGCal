@@ -141,10 +141,10 @@ struct BriefingNoteEditorView: View {
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.75))
+                            .fill(TGTheme.insetFill)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.95), lineWidth: 1)
+                                    .stroke(TGTheme.insetStroke, lineWidth: 1)
                             )
                     )
             }
@@ -333,10 +333,10 @@ struct NextFlightBriefingDetailView: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.55))
+                    .fill(TGTheme.insetFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                            .stroke(TGTheme.insetStroke, lineWidth: 1)
                     )
             )
         }
@@ -404,10 +404,10 @@ struct NextFlightBriefingDetailView: View {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.62))
+                .fill(TGTheme.insetFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                        .stroke(TGTheme.insetStroke, lineWidth: 1)
                 )
         )
     }

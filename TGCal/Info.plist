@@ -26,8 +26,6 @@
 	<string>TGCal needs access to add your flights to your calendar.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>TGCal adds your parsed roster flights to your calendar.</string>
-	<key>AVIATIONSTACK_API_KEY</key>
-	<string>ea38c0451d04b2e6c7d4115388004f11</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIApplicationSceneManifest</key>

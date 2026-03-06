@@ -34,22 +34,14 @@ private struct SplashScreenView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.92, green: 0.94, blue: 1.0),
-                    Color(red: 0.90, green: 0.97, blue: 0.98),
-                    Color(red: 0.96, green: 0.91, blue: 0.98)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            TGTheme.backgroundGradient
             .ignoresSafeArea()
 
             VStack(spacing: 16) {
                 AppIconView()
                     .frame(width: 108, height: 108)
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .shadow(color: .black.opacity(0.14), radius: 16, x: 0, y: 10)
+                    .shadow(color: TGTheme.splashIconShadow, radius: 16, x: 0, y: 10)
                     .scaleEffect(iconAppeared ? 1 : 0.92)
                     .opacity(iconAppeared ? 1 : 0.85)
 
@@ -76,10 +68,10 @@ private struct AppIconView: View {
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.white.opacity(0.9))
+                    .fill(TGTheme.iconTileFill)
                 Image(systemName: "calendar.badge.plus")
                     .font(.system(size: 42, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.42, green: 0.50, blue: 0.90))
+                    .foregroundStyle(TGTheme.indigo)
             }
         }
     }

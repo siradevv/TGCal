@@ -1,13 +1,37 @@
 import Foundation
 
 enum AviationstackConfiguration {
-    private static let infoPlistKey = "AVIATIONSTACK_API_KEY"
+    private static let apiKeyName = "AVIATIONSTACK_API_KEY"
+    private static let secretsPlistName = "AviationstackSecrets"
 
     static var apiKey: String? {
-        guard let raw = Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String else {
+        if let value = normalized(Bundle.main.object(forInfoDictionaryKey: apiKeyName) as? String) {
+            return value
+        }
+
+        if let url = Bundle.main.url(forResource: secretsPlistName, withExtension: "plist"),
+           let values = NSDictionary(contentsOf: url) as? [String: Any],
+           let value = normalized(values[apiKeyName] as? String) {
+            return value
+        }
+
+        if let value = normalized(ProcessInfo.processInfo.environment[apiKeyName]) {
+            return value
+        }
+
+        return nil
+    }
+
+    private static func normalized(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.isEmpty == false else {
             return nil
         }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+
+        if trimmed.hasPrefix("$("), trimmed.hasSuffix(")") {
+            return nil
+        }
+
+        return trimmed
     }
 }

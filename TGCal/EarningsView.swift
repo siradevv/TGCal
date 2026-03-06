@@ -218,12 +218,12 @@ private struct EarningsCardModifier: ViewModifier {
             .padding(.vertical, verticalPadding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.66))
+                    .fill(TGTheme.cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.95), lineWidth: 1.1)
+                            .stroke(TGTheme.cardStroke, lineWidth: 1.1)
                     )
-                    .shadow(color: Color.black.opacity(0.05), radius: 14, x: 0, y: 8)
+                    .shadow(color: TGTheme.cardShadow, radius: 14, x: 0, y: 8)
             )
     }
 }

@@ -17,7 +17,7 @@ struct TGNoRosterHeroCard: View {
                         .blur(radius: glowPulse ? 0 : 2)
 
                     Circle()
-                        .fill(Color.white.opacity(0.88))
+                        .fill(TGTheme.iconTileFill)
                         .frame(width: 72, height: 72)
 
                     Image(systemName: "airplane.circle.fill")
@@ -71,12 +71,12 @@ struct TGNoRosterHeroCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(Color.white.opacity(0.72))
+                .fill(TGTheme.cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .stroke(Color.white.opacity(0.95), lineWidth: 1.2)
+                        .stroke(TGTheme.cardStroke, lineWidth: 1.2)
                 )
-                .shadow(color: Color.black.opacity(0.10), radius: 24, x: 0, y: 14)
+                .shadow(color: TGTheme.cardShadow, radius: 24, x: 0, y: 14)
         )
         .onAppear {
             glowPulse = true

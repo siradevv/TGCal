@@ -454,27 +454,15 @@ struct ContentView: View {
     }
 
     private var themeIndigo: Color {
-        Color(red: 0.42, green: 0.50, blue: 0.90)
+        TGTheme.indigo
     }
 
     private var themeRose: Color {
-        Color(red: 0.94, green: 0.60, blue: 0.76)
-    }
-
-    private var themeMint: Color {
-        Color(red: 0.64, green: 0.89, blue: 0.82)
+        TGTheme.rose
     }
 
     private var backgroundGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.92, green: 0.94, blue: 1.0),
-                Color(red: 0.90, green: 0.97, blue: 0.98),
-                Color(red: 0.96, green: 0.91, blue: 0.98)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        TGTheme.backgroundGradient
     }
 
     @ViewBuilder
@@ -667,11 +655,11 @@ struct ContentView: View {
             .frame(width: 30, height: 30)
             .background(
                 Circle()
-                    .fill(Color.white.opacity(0.58))
+                    .fill(TGTheme.controlFill)
             )
             .overlay(
                 Circle()
-                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                    .stroke(TGTheme.controlStroke, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -1366,12 +1354,12 @@ private struct TGCardModifier: ViewModifier {
             .padding(.vertical, verticalPadding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.66))
+                    .fill(TGTheme.cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.95), lineWidth: 1.1)
+                            .stroke(TGTheme.cardStroke, lineWidth: 1.1)
                     )
-                    .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 12)
+                    .shadow(color: TGTheme.cardShadow, radius: 20, x: 0, y: 12)
             )
     }
 }

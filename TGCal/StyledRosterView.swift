@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 
 struct StyledRosterView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let month: Int
     let year: Int
     let rows: [StyledRosterRow]
@@ -9,9 +11,6 @@ struct StyledRosterView: View {
     private let leftColumnWidth: CGFloat = 120
     private let rowHeight: CGFloat = 42
     private let headerHeight: CGFloat = 44
-    private let headerPurple = Color(red: 74 / 255, green: 0 / 255, blue: 130 / 255)
-    private let lavenderRow = Color(red: 232 / 255, green: 230 / 255, blue: 245 / 255)
-    private let pinkRow = Color(red: 243 / 255, green: 230 / 255, blue: 238 / 255)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,10 +19,10 @@ struct StyledRosterView: View {
                 dayRow(row: row, isEven: index.isMultiple(of: 2))
             }
         }
-        .background(.white)
+        .background(tableBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 0)
-                .stroke(Color.white, lineWidth: 1)
+                .stroke(gridColor, lineWidth: 1)
         )
     }
 
@@ -42,7 +41,7 @@ struct StyledRosterView: View {
         }
         .frame(height: headerHeight)
         .background(headerPurple)
-        .overlay(Rectangle().fill(Color.white).frame(width: 1), alignment: .leading)
+        .overlay(Rectangle().fill(gridColor).frame(width: 1), alignment: .leading)
     }
 
     private func dayRow(row: StyledRosterRow, isEven: Bool) -> some View {
@@ -52,12 +51,12 @@ struct StyledRosterView: View {
             HStack(spacing: 10) {
                 Text("\(row.day)")
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 106 / 255, green: 88 / 255, blue: 138 / 255))
+                    .foregroundStyle(secondaryTextColor)
                     .frame(width: 24, alignment: .leading)
 
                 Text(row.weekdayText)
                     .font(.system(size: 19))
-                    .foregroundStyle(Color(red: 106 / 255, green: 88 / 255, blue: 138 / 255))
+                    .foregroundStyle(secondaryTextColor)
             }
             .frame(width: leftColumnWidth, alignment: .leading)
             .padding(.leading, 12)
@@ -65,7 +64,7 @@ struct StyledRosterView: View {
 
             Text(row.valueText)
                 .font(.system(size: 22))
-                .foregroundStyle(Color(red: 54 / 255, green: 42 / 255, blue: 82 / 255))
+                .foregroundStyle(primaryTextColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 10)
                 .background(background)
@@ -73,14 +72,56 @@ struct StyledRosterView: View {
         .frame(height: rowHeight)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.white)
+                .fill(gridColor)
                 .frame(height: 1)
         }
         .overlay(alignment: .leading) {
             Rectangle()
-                .fill(Color.white)
+                .fill(gridColor)
                 .frame(width: 1)
         }
+    }
+
+    private var tableBackground: Color {
+        colorScheme == .dark
+            ? Color(red: 0.10, green: 0.09, blue: 0.14)
+            : .white
+    }
+
+    private var headerPurple: Color {
+        colorScheme == .dark
+            ? Color(red: 0.29, green: 0.20, blue: 0.43)
+            : Color(red: 74 / 255, green: 0 / 255, blue: 130 / 255)
+    }
+
+    private var lavenderRow: Color {
+        colorScheme == .dark
+            ? Color(red: 0.16, green: 0.15, blue: 0.24)
+            : Color(red: 232 / 255, green: 230 / 255, blue: 245 / 255)
+    }
+
+    private var pinkRow: Color {
+        colorScheme == .dark
+            ? Color(red: 0.19, green: 0.15, blue: 0.22)
+            : Color(red: 243 / 255, green: 230 / 255, blue: 238 / 255)
+    }
+
+    private var primaryTextColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.92, green: 0.90, blue: 0.97)
+            : Color(red: 54 / 255, green: 42 / 255, blue: 82 / 255)
+    }
+
+    private var secondaryTextColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.80, green: 0.76, blue: 0.90)
+            : Color(red: 106 / 255, green: 88 / 255, blue: 138 / 255)
+    }
+
+    private var gridColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.16)
+            : Color.white
     }
 
     private var monthTitle: String {

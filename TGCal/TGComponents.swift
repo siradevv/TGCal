@@ -1,17 +1,82 @@
 import SwiftUI
+import UIKit
 
 enum TGTheme {
     static let indigo = Color(red: 0.42, green: 0.50, blue: 0.90)
+    static let rose = Color(red: 0.94, green: 0.60, blue: 0.76)
+    static let mint = Color(red: 0.64, green: 0.89, blue: 0.82)
 
     static let backgroundGradient = LinearGradient(
         colors: [
-            Color(red: 0.92, green: 0.94, blue: 1.0),
-            Color(red: 0.90, green: 0.97, blue: 0.98),
-            Color(red: 0.96, green: 0.91, blue: 0.98)
+            dynamicColor(
+                light: UIColor(red: 0.92, green: 0.94, blue: 1.0, alpha: 1),
+                dark: UIColor(red: 0.07, green: 0.09, blue: 0.14, alpha: 1)
+            ),
+            dynamicColor(
+                light: UIColor(red: 0.90, green: 0.97, blue: 0.98, alpha: 1),
+                dark: UIColor(red: 0.08, green: 0.14, blue: 0.18, alpha: 1)
+            ),
+            dynamicColor(
+                light: UIColor(red: 0.96, green: 0.91, blue: 0.98, alpha: 1),
+                dark: UIColor(red: 0.13, green: 0.08, blue: 0.17, alpha: 1)
+            )
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+
+    static let cardFill = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.66),
+        dark: UIColor(red: 0.13, green: 0.15, blue: 0.22, alpha: 0.82)
+    )
+
+    static let cardStroke = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.95),
+        dark: UIColor.white.withAlphaComponent(0.18)
+    )
+
+    static let cardShadow = dynamicColor(
+        light: UIColor.black.withAlphaComponent(0.08),
+        dark: UIColor.black.withAlphaComponent(0.35)
+    )
+
+    static let insetFill = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.62),
+        dark: UIColor.white.withAlphaComponent(0.10)
+    )
+
+    static let insetStroke = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.92),
+        dark: UIColor.white.withAlphaComponent(0.22)
+    )
+
+    static let controlFill = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.58),
+        dark: UIColor.white.withAlphaComponent(0.14)
+    )
+
+    static let controlStroke = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.90),
+        dark: UIColor.white.withAlphaComponent(0.24)
+    )
+
+    static let iconTileFill = dynamicColor(
+        light: UIColor.white.withAlphaComponent(0.88),
+        dark: UIColor.white.withAlphaComponent(0.18)
+    )
+
+    static let splashIconShadow = dynamicColor(
+        light: UIColor.black.withAlphaComponent(0.14),
+        dark: UIColor.black.withAlphaComponent(0.42)
+    )
+
+    private static func dynamicColor(light: UIColor, dark: UIColor) -> Color {
+        Color(
+            uiColor: UIColor { traits in
+                traits.userInterfaceStyle == .dark ? dark : light
+            }
+        )
+    }
 }
 
 struct TGBackgroundView: View {
@@ -48,12 +113,12 @@ private struct TGFrostedCardModifier: ViewModifier {
             .padding(.vertical, verticalPadding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.66))
+                    .fill(TGTheme.cardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.95), lineWidth: 1.1)
+                            .stroke(TGTheme.cardStroke, lineWidth: 1.1)
                     )
-                    .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 12)
+                    .shadow(color: TGTheme.cardShadow, radius: 20, x: 0, y: 12)
             )
     }
 }
