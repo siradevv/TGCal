@@ -1,16 +1,18 @@
 # TGCal App Store Connect Submission Sheet
 
-Last updated: February 27, 2026
+Last updated: March 6, 2026
 
 ## 1) URLs (Required)
-- Privacy Policy URL: publish `AppStore/privacy-policy.html`
-- Support URL: publish `AppStore/support.html`
+- Privacy Policy URL: `https://siradevv.github.io/TGCal/AppStore/privacy-policy.html`
+- Support URL: `https://siradevv.github.io/TGCal/AppStore/support.html`
+- Marketing URL: `https://siradevv.github.io/TGCal/AppStore/marketing.html`
 - Contact email: `tgcal.app@gmail.com`
 
-Quick host options:
-1. GitHub Pages
-2. Netlify Drop
-3. Any static hosting provider
+GitHub Pages setup for this repo (`siradevv/TGCal`):
+1. GitHub -> Settings -> Pages
+2. Build and deployment: `Deploy from a branch`
+3. Branch: `main` and folder: `/ (root)`
+4. Save, then wait for deployment.
 
 ## 2) App Privacy (Recommended baseline for current TGCal build)
 Use these if the app behavior remains unchanged:

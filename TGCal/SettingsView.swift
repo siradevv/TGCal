@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
+    @State private var isShowingPrivacyPolicy = false
 
     var body: some View {
         NavigationStack {
@@ -11,35 +12,40 @@ struct SettingsView: View {
                 VStack(spacing: 0) {
                     List {
                         Section {
-                            Button {
-                                if let url = URL(string: "https://tgcalapp.github.io/privacy-policy.html") {
-                                    openURL(url)
-                                }
+                            VStack(spacing: 0) {
+                                Button {
+                                    isShowingPrivacyPolicy = true
                             } label: {
                                 settingsRow(
-                                    title: "Privacy Policy",
-                                    subtitle: "Read how TGCal handles your data"
+                                    title: "Privacy Policy"
                                 )
                             }
                             .buttonStyle(.plain)
 
-                            Button {
-                                if let url = URL(string: "mailto:tgcal.app@gmail.com?subject=TGCal%20Support") {
-                                    openURL(url)
-                                }
+                                Divider()
+
+                                Button {
+                                    if let url = URL(string: "mailto:tgcal.app@gmail.com?subject=TGCal%20Support") {
+                                        openURL(url)
+                                    }
                             } label: {
                                 settingsRow(
-                                    title: "Contact Support",
-                                    subtitle: "Send feedback or report an issue"
+                                    title: "Contact Support"
                                 )
                             }
                             .buttonStyle(.plain)
+                            }
+                            .tgFrostedCard(cornerRadius: 18, verticalPadding: 8)
+                            .padding(.vertical, 2)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         } header: {
                             TGSectionHeader(title: "Support", systemImage: "questionmark.circle")
                                 .textCase(nil)
                         }
                     }
                     .listStyle(.insetGrouped)
+                    .listSectionSpacing(.compact)
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
 
@@ -50,6 +56,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(isPresented: $isShowingPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
         }
     }
 
@@ -59,15 +68,12 @@ struct SettingsView: View {
         return "Version \(shortVersion) (\(build))"
     }
 
-    private func settingsRow(title: String, subtitle: String) -> some View {
+    private func settingsRow(title: String) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()
