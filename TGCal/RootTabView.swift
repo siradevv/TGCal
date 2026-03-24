@@ -3,6 +3,7 @@ import SwiftUI
 enum Tab: Hashable {
     case overview
     case roster
+    case swap
     case logbook
     case settings
 }
@@ -26,6 +27,13 @@ struct RootTabView: View {
                     Label("Flights", systemImage: "airplane")
                 }
                 .tag(Tab.roster)
+
+            SwapBoardView()
+                .environmentObject(store)
+                .tabItem {
+                    Label("Swap", systemImage: "arrow.triangle.swap")
+                }
+                .tag(Tab.swap)
 
             LogbookView()
                 .environmentObject(store)

@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @State private var isShowingPrivacyPolicy = false
+    @State private var isShowingProfile = false
+    @ObservedObject private var supabase = SupabaseService.shared
     @AppStorage("reminders_enabled") private var remindersEnabled = true
     @AppStorage("reminder_12h") private var reminder12h = true
     @AppStorage("reminder_3h") private var reminder3h = true
@@ -14,6 +16,51 @@ struct SettingsView: View {
 
                 VStack(spacing: 0) {
                     List {
+                        if supabase.isAuthenticated {
+                            Section {
+                                VStack(spacing: 0) {
+                                    Button {
+                                        isShowingProfile = true
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(TGTheme.indigo.opacity(0.15))
+                                                    .frame(width: 40, height: 40)
+                                                Image(systemName: "person.fill")
+                                                    .font(.headline)
+                                                    .foregroundStyle(TGTheme.indigo)
+                                            }
+
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(supabase.currentUser?.displayName ?? "Crew Member")
+                                                    .font(.body.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+                                                Text(supabase.currentUser?.crewRank.displayName ?? "Cabin Crew")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+
+                                            Spacer()
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        .padding(.vertical, 6)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .tgFrostedCard(cornerRadius: 18, verticalPadding: 8)
+                                .padding(.vertical, 2)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                            } header: {
+                                TGSectionHeader(title: "Account", systemImage: "person.circle")
+                                    .textCase(nil)
+                            }
+                        }
+
                         Section {
                             VStack(spacing: 0) {
                                 Toggle(isOn: $remindersEnabled) {
@@ -113,6 +160,9 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationDestination(isPresented: $isShowingPrivacyPolicy) {
                 PrivacyPolicyView()
+            }
+            .navigationDestination(isPresented: $isShowingProfile) {
+                ProfileView()
             }
         }
     }
