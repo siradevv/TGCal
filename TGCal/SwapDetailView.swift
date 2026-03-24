@@ -14,6 +14,10 @@ struct SwapDetailView: View {
         supabase.currentUser?.id == listing.postedBy
     }
 
+    private var isTooCloseToDepart: Bool {
+        SwapService.shared.isSwappable(listing) == false
+    }
+
     var body: some View {
         ZStack {
             TGBackgroundView()
@@ -79,24 +83,36 @@ struct SwapDetailView: View {
 
                     // Action button
                     if isOwnListing == false {
-                        Button {
-                            Task { await startChat() }
-                        } label: {
-                            Group {
-                                if isStartingChat {
-                                    ProgressView().tint(.white)
-                                } else {
-                                    Label("Message About This Swap", systemImage: "bubble.left.fill")
-                                        .font(.headline.weight(.semibold))
-                                }
+                        if isTooCloseToDepart {
+                            HStack(spacing: 8) {
+                                Image(systemName: "clock.badge.exclamationmark")
+                                    .foregroundStyle(.orange)
+                                Text("Swaps must be initiated at least 24 hours before departure")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                            .padding(.vertical, 12)
+                        } else {
+                            Button {
+                                Task { await startChat() }
+                            } label: {
+                                Group {
+                                    if isStartingChat {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        Label("Message About This Swap", systemImage: "bubble.left.fill")
+                                            .font(.headline.weight(.semibold))
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(TGTheme.indigo)
+                            .disabled(isStartingChat)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(TGTheme.indigo)
-                        .disabled(isStartingChat)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
                     } else {
                         HStack(spacing: 8) {
                             Image(systemName: "info.circle")

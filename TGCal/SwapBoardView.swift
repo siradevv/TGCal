@@ -90,7 +90,7 @@ struct SwapBoardView: View {
                 ProgressView()
                     .tint(TGTheme.indigo)
                 Spacer()
-            } else if swapService.listings.isEmpty {
+            } else if swappableListings.isEmpty {
                 emptyState
             } else {
                 listingsScrollView
@@ -223,10 +223,15 @@ struct SwapBoardView: View {
         }
     }
 
+    /// Only show listings where departure is >24 hours away.
+    private var swappableListings: [SwapListing] {
+        swapService.listings.filter { swapService.isSwappable($0) }
+    }
+
     private var listingsScrollView: some View {
         ScrollView {
             LazyVStack(spacing: 10) {
-                ForEach(swapService.listings) { listing in
+                ForEach(swappableListings) { listing in
                     SwapListingCard(listing: listing) {
                         selectedListing = listing
                     }

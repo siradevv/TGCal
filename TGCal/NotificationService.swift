@@ -134,6 +134,96 @@ final class NotificationService {
         }
     }
 
+    // MARK: - Swap Notifications
+
+    /// Notify the listing poster that someone wants to swap.
+    func notifyNewSwapConversation(listingFlightCode: String, fromName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "New Swap Interest"
+        content.body = "\(fromName) wants to swap \(listingFlightCode) with you."
+        content.sound = .default
+        content.categoryIdentifier = "SWAP_CONVERSATION"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "\(identifierPrefix)swap-conv-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { error in
+            if let error {
+                print("[NotificationService] Swap conversation notification error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Notify the other party about a new chat message.
+    func notifyNewSwapMessage(fromName: String, text: String) {
+        let content = UNMutableNotificationContent()
+        content.title = fromName
+        content.body = text
+        content.sound = .default
+        content.categoryIdentifier = "SWAP_MESSAGE"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "\(identifierPrefix)swap-msg-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { error in
+            if let error {
+                print("[NotificationService] Swap message notification error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Notify both parties that a swap has been confirmed.
+    func notifySwapConfirmed(flightCode: String, otherPartyName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Swap Confirmed"
+        content.body = "\(flightCode) swap with \(otherPartyName) is confirmed. Check your calendar."
+        content.sound = .default
+        content.categoryIdentifier = "SWAP_CONFIRMED"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "\(identifierPrefix)swap-confirmed-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { error in
+            if let error {
+                print("[NotificationService] Swap confirmed notification error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Notify the other party that a swap was cancelled.
+    func notifySwapCancelled(flightCode: String, cancelledByName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Swap Cancelled"
+        content.body = "\(cancelledByName) cancelled the \(flightCode) swap."
+        content.sound = .default
+        content.categoryIdentifier = "SWAP_CANCELLED"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "\(identifierPrefix)swap-cancelled-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { error in
+            if let error {
+                print("[NotificationService] Swap cancelled notification error: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Private
 
     private func scheduleNotification(identifier: String, body: String, fireDate: Date) {

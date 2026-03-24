@@ -110,6 +110,11 @@ final class SwapService: ObservableObject {
             throw SwapServiceError.notAuthenticated
         }
 
+        // Enforce 24-hour rule
+        guard isSwappable(listing) else {
+            throw SwapServiceError.tooCloseToDepature
+        }
+
         // Check if conversation already exists
         let existing: [Conversation] = try await client
             .from("conversations")
@@ -138,6 +143,14 @@ final class SwapService: ObservableObject {
             .value
 
         conversations.insert(created, at: 0)
+
+        // Notify the listing poster
+        let initiatorName = SupabaseService.shared.currentUser?.displayName ?? "Someone"
+        NotificationService.shared.notifyNewSwapConversation(
+            listingFlightCode: listing.flightCode,
+            fromName: initiatorName
+        )
+
         return created
     }
 
@@ -155,7 +168,8 @@ final class SwapService: ObservableObject {
         var updates: [String: String] = [field: "true"]
 
         // If both parties confirmed, mark as confirmed
-        if otherConfirmed {
+        let bothConfirmed = otherConfirmed
+        if bothConfirmed {
             updates["status"] = "confirmed"
 
             // Also update the listing status
@@ -172,11 +186,26 @@ final class SwapService: ObservableObject {
             .eq("id", value: conversationId.uuidString)
             .execute()
 
+        // When both confirmed: add calendar event + notify
+        if bothConfirmed {
+            if let listing = await fetchListing(id: conversation.listingId) {
+                await SwapCalendarService.shared.addSwapEvent(listing: listing)
+
+                let otherName = await otherPartyName(conversation: conversation, currentUser: userId)
+                NotificationService.shared.notifySwapConfirmed(
+                    flightCode: listing.flightCode,
+                    otherPartyName: otherName
+                )
+            }
+        }
+
         // Refresh
         try await fetchMyConversations()
     }
 
     func cancelSwap(conversationId: UUID) async throws {
+        guard let userId = SupabaseService.shared.currentUser?.id else { return }
+
         try await client
             .from("conversations")
             .update(["status": "cancelled", "initiator_confirmed": "false", "owner_confirmed": "false"])
@@ -191,6 +220,17 @@ final class SwapService: ObservableObject {
             .update(["status": "open", "matched_with": NSNull()])
             .eq("id", value: conversation.listingId.uuidString)
             .execute()
+
+        // Remove calendar event + notify the other party
+        if let listing = await fetchListing(id: conversation.listingId) {
+            await SwapCalendarService.shared.removeSwapEvent(listing: listing)
+
+            let cancellerName = SupabaseService.shared.currentUser?.displayName ?? "Someone"
+            NotificationService.shared.notifySwapCancelled(
+                flightCode: listing.flightCode,
+                cancelledByName: cancellerName
+            )
+        }
 
         try await fetchMyConversations()
     }
@@ -236,6 +276,10 @@ final class SwapService: ObservableObject {
             .eq("id", value: conversationId.uuidString)
             .execute()
 
+        // Notify the other party about the new message
+        let senderName = SupabaseService.shared.currentUser?.displayName ?? "Crew Member"
+        NotificationService.shared.notifyNewSwapMessage(fromName: senderName, text: text)
+
         return sent
     }
 
@@ -263,23 +307,69 @@ final class SwapService: ObservableObject {
             .value
     }
 
+    // MARK: - Listing Lookup
+
+    func fetchListing(id: UUID) async -> SwapListing? {
+        try? await client
+            .from("swap_listings")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
+    private func otherPartyName(conversation: Conversation, currentUser: UUID) async -> String {
+        let otherId = conversation.otherParticipantId(currentUser: currentUser)
+        if let profile = try? await fetchProfile(userId: otherId) {
+            return profile.displayName
+        }
+        return "Crew Member"
+    }
+
     // MARK: - Helpers
+
+    /// Returns true if the listing's departure is more than 24 hours away.
+    func isSwappable(_ listing: SwapListing) -> Bool {
+        departureDate(for: listing).map { $0.timeIntervalSinceNow > 24 * 3600 } ?? false
+    }
+
+    /// Parses the listing's flight date + departure time into a Date.
+    func departureDate(for listing: SwapListing) -> Date? {
+        guard let baseDate = Self.dateFormatter.date(from: listing.flightDate) else { return nil }
+
+        if let depTime = listing.departureTime, let minutes = depTime.hhmmMinutes {
+            return Calendar.roster.date(
+                bySettingHour: minutes / 60,
+                minute: minutes % 60,
+                second: 0,
+                of: baseDate
+            ) ?? baseDate
+        }
+
+        // If no departure time, use end of day as conservative estimate
+        return Calendar.roster.date(bySettingHour: 23, minute: 59, second: 0, of: baseDate) ?? baseDate
+    }
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = rosterTimeZone
         return f
     }()
 }
 
 enum SwapServiceError: LocalizedError {
     case notAuthenticated
+    case tooCloseToDepature
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
             return "You must be signed in to do this."
+        case .tooCloseToDepature:
+            return "Swaps must be initiated at least 24 hours before departure."
         }
     }
 }

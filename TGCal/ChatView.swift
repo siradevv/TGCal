@@ -13,9 +13,15 @@ struct ChatView: View {
     @State private var showConfirmSwap = false
     @State private var showCancelSwap = false
     @State private var isConfirming = false
+    @State private var listing: SwapListing?
 
     private var currentUserId: UUID? {
         supabase.currentUser?.id
+    }
+
+    private var isTooCloseToDepart: Bool {
+        guard let listing else { return false }
+        return SwapService.shared.isSwappable(listing) == false
     }
 
     private var hasCurrentUserConfirmed: Bool {
@@ -144,10 +150,17 @@ struct ChatView: View {
     private var swapActionMenu: some View {
         Menu {
             if conversation.status == .active && hasCurrentUserConfirmed == false {
-                Button {
-                    showConfirmSwap = true
-                } label: {
-                    Label("Confirm Swap", systemImage: "checkmark.seal")
+                if isTooCloseToDepart {
+                    Button {} label: {
+                        Label("Too close to departure", systemImage: "clock.badge.exclamationmark")
+                    }
+                    .disabled(true)
+                } else {
+                    Button {
+                        showConfirmSwap = true
+                    } label: {
+                        Label("Confirm Swap", systemImage: "checkmark.seal")
+                    }
                 }
             }
 
@@ -225,6 +238,9 @@ struct ChatView: View {
     private func loadData() async {
         isLoading = true
         defer { isLoading = false }
+
+        // Load listing for 24-hour check
+        listing = await SwapService.shared.fetchListing(id: conversation.listingId)
 
         // Load other user name
         if let userId = currentUserId {
