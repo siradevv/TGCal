@@ -86,6 +86,8 @@ final class TGCalStore: ObservableObject {
         }
         activeMonthId = record.id
         saveToDisk()
+        WidgetDataService.updateNextFlight(from: months)
+        NotificationService.shared.scheduleReminders(for: record)
     }
 
     func setActiveMonth(_ id: String?) {

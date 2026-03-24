@@ -25,6 +25,12 @@ struct TGCalApp: App {
                     showSplash = false
                 }
             }
+            .onAppear {
+                if UserDefaults.standard.bool(forKey: "reminders_enabled") {
+                    NotificationService.shared.requestPermission()
+                }
+                WidgetDataService.updateNextFlight(from: store.months)
+            }
         }
     }
 }
