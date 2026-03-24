@@ -1,8 +1,10 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct TGCalApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var showSplash = true
     @StateObject private var store = TGCalStore()
 
@@ -30,7 +32,42 @@ struct TGCalApp: App {
                     NotificationService.shared.requestPermission()
                 }
                 WidgetDataService.updateNextFlight(from: store.months)
+
+                // Register for push notifications
+                PushNotificationManager.shared.requestPermissionAndRegister()
             }
+        }
+    }
+}
+
+// MARK: - AppDelegate for APNs token callbacks
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        // Set push notification delegate
+        UNUserNotificationCenter.current().delegate = PushNotificationManager.shared
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            PushNotificationManager.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in
+            PushNotificationManager.shared.didFailToRegisterForRemoteNotifications(error: error)
         }
     }
 }

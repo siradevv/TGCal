@@ -35,15 +35,18 @@ final class SupabaseService: ObservableObject {
 
         if result.user != nil {
             try await loadProfile()
+            PushNotificationManager.shared.registerTokenAfterLogin()
         }
     }
 
     func signIn(email: String, password: String) async throws {
         try await client.auth.signIn(email: email, password: password)
         try await loadProfile()
+        PushNotificationManager.shared.registerTokenAfterLogin()
     }
 
     func signOut() async throws {
+        await PushNotificationManager.shared.removeTokenOnLogout()
         try await client.auth.signOut()
         currentUser = nil
         isAuthenticated = false
@@ -54,6 +57,7 @@ final class SupabaseService: ObservableObject {
             let session = try await client.auth.session
             if session.user.id.uuidString.isEmpty == false {
                 try await loadProfile()
+                PushNotificationManager.shared.registerTokenAfterLogin()
             }
         } catch {
             currentUser = nil

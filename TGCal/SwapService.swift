@@ -144,12 +144,8 @@ final class SwapService: ObservableObject {
 
         conversations.insert(created, at: 0)
 
-        // Notify the listing poster
-        let initiatorName = SupabaseService.shared.currentUser?.displayName ?? "Someone"
-        NotificationService.shared.notifyNewSwapConversation(
-            listingFlightCode: listing.flightCode,
-            fromName: initiatorName
-        )
+        // Push notification to listing owner is handled server-side
+        // by the on_new_conversation DB trigger → send-push Edge Function.
 
         return created
     }
@@ -186,16 +182,10 @@ final class SwapService: ObservableObject {
             .eq("id", value: conversationId.uuidString)
             .execute()
 
-        // When both confirmed: add calendar event + notify
+        // When both confirmed: add calendar event (push notification handled server-side)
         if bothConfirmed {
             if let listing = await fetchListing(id: conversation.listingId) {
                 await SwapCalendarService.shared.addSwapEvent(listing: listing)
-
-                let otherName = await otherPartyName(conversation: conversation, currentUser: userId)
-                NotificationService.shared.notifySwapConfirmed(
-                    flightCode: listing.flightCode,
-                    otherPartyName: otherName
-                )
             }
         }
 
@@ -221,15 +211,9 @@ final class SwapService: ObservableObject {
             .eq("id", value: conversation.listingId.uuidString)
             .execute()
 
-        // Remove calendar event + notify the other party
+        // Remove calendar event (push notification handled server-side)
         if let listing = await fetchListing(id: conversation.listingId) {
             await SwapCalendarService.shared.removeSwapEvent(listing: listing)
-
-            let cancellerName = SupabaseService.shared.currentUser?.displayName ?? "Someone"
-            NotificationService.shared.notifySwapCancelled(
-                flightCode: listing.flightCode,
-                cancelledByName: cancellerName
-            )
         }
 
         try await fetchMyConversations()
@@ -276,9 +260,8 @@ final class SwapService: ObservableObject {
             .eq("id", value: conversationId.uuidString)
             .execute()
 
-        // Notify the other party about the new message
-        let senderName = SupabaseService.shared.currentUser?.displayName ?? "Crew Member"
-        NotificationService.shared.notifyNewSwapMessage(fromName: senderName, text: text)
+        // Push notification to recipient is handled server-side
+        // by the on_new_message DB trigger → send-push Edge Function.
 
         return sent
     }
