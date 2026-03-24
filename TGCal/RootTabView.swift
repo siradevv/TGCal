@@ -1,30 +1,30 @@
 import SwiftUI
 
 enum Tab: Hashable {
-    case overview
+    case calendar
     case roster
     case swap
-    case logbook
-    case settings
+    case crew
+    case more
 }
 
 struct RootTabView: View {
     @EnvironmentObject private var store: TGCalStore
-    @State private var selectedTab: Tab = .overview
+    @State private var selectedTab: Tab = .calendar
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            OverviewView(selectedTab: $selectedTab)
+            CalendarTabView(selectedTab: $selectedTab)
                 .environmentObject(store)
                 .tabItem {
-                    Label("Overview", systemImage: "house")
+                    Label("Calendar", systemImage: "calendar")
                 }
-                .tag(Tab.overview)
+                .tag(Tab.calendar)
 
             ContentView()
                 .environmentObject(store)
                 .tabItem {
-                    Label("Flights", systemImage: "airplane")
+                    Label("Roster", systemImage: "airplane")
                 }
                 .tag(Tab.roster)
 
@@ -35,19 +35,19 @@ struct RootTabView: View {
                 }
                 .tag(Tab.swap)
 
-            LogbookView()
+            CrewHubView()
                 .environmentObject(store)
                 .tabItem {
-                    Label("Logbook", systemImage: "chart.bar.xaxis")
+                    Label("Crew", systemImage: "person.2")
                 }
-                .tag(Tab.logbook)
+                .tag(Tab.crew)
 
-            SettingsView()
+            MoreTabView()
                 .environmentObject(store)
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("More", systemImage: "ellipsis.circle")
                 }
-                .tag(Tab.settings)
+                .tag(Tab.more)
         }
     }
 }

@@ -158,6 +158,29 @@ final class NotificationService {
         }
     }
 
+    // MARK: - Flight Disruption Alerts
+
+    func scheduleFlightAlert(_ alert: FlightAlert) {
+        let content = UNMutableNotificationContent()
+        content.title = "Flight \(alert.alertType.displayName)"
+        content.body = alert.message
+        content.sound = .default
+        content.categoryIdentifier = "FLIGHT_ALERT"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "\(identifierPrefix)alert-\(alert.id.uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { error in
+            if let error {
+                print("[NotificationService] Flight alert notification error: \(error.localizedDescription)")
+            }
+        }
+    }
+
     /// Notify the other party about a new chat message.
     func notifyNewSwapMessage(fromName: String, text: String) {
         let content = UNMutableNotificationContent()
