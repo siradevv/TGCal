@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Browse layover tips organized by destination, with crew-curated recommendations.
 struct LayoverGuideView: View {
@@ -354,6 +355,7 @@ struct LayoverTipCard: View {
 
     @ObservedObject private var layoverService = LayoverService.shared
     @State private var isVoting = false
+    @State private var isShowingFullPhoto = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -381,6 +383,55 @@ struct LayoverTipCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(4)
+
+            // Photo
+            if let photoUrl = tip.photoUrl, let url = URL(string: photoUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(maxHeight: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .onTapGesture { isShowingFullPhoto = true }
+                    case .failure:
+                        EmptyView()
+                    default:
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(TGTheme.insetFill)
+                            .frame(height: 120)
+                            .overlay(ProgressView().tint(TGTheme.indigo))
+                    }
+                }
+                .fullScreenCover(isPresented: $isShowingFullPhoto) {
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        AsyncImage(url: url) { phase in
+                            if let image = phase.image {
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                            }
+                        }
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    isShowingFullPhoto = false
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+                                .padding(20)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+            }
 
             HStack(spacing: 16) {
                 Spacer()
@@ -450,6 +501,8 @@ struct AddLayoverTipView: View {
     @State private var tipBody = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
 
     var body: some View {
         NavigationStack {
@@ -527,6 +580,42 @@ struct AddLayoverTipView: View {
                                 )
                         }
 
+                        // Photo (optional)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Photo (optional)")
+                                .font(.subheadline.weight(.semibold))
+
+                            if let selectedImage {
+                                Image(uiImage: selectedImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(maxHeight: 200)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                                Button(role: .destructive) {
+                                    self.selectedPhoto = nil
+                                    self.selectedImage = nil
+                                } label: {
+                                    Label("Remove Photo", systemImage: "trash")
+                                        .font(.caption)
+                                }
+                            }
+
+                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                Label(
+                                    selectedImage == nil ? "Add Photo" : "Change Photo",
+                                    systemImage: "photo.badge.plus"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(TGTheme.indigo)
+                        }
+                        .onChange(of: selectedPhoto) { _, newItem in
+                            Task { await loadSelectedPhoto(newItem) }
+                        }
+
                         if let error = errorMessage {
                             Text(error)
                                 .font(.caption)
@@ -583,13 +672,28 @@ struct AddLayoverTipView: View {
         isSubmitting = true
         defer { isSubmitting = false }
 
+        // Upload photo if selected
+        var photoUrl: String?
+        if let selectedImage, let photoData = compressedPhotoData(selectedImage) {
+            do {
+                photoUrl = try await LayoverService.shared.uploadTipPhoto(
+                    imageData: photoData,
+                    userId: user.id
+                )
+            } catch {
+                errorMessage = "Photo upload failed: \(error.localizedDescription)"
+                return
+            }
+        }
+
         let newTip = NewLayoverTip(
             airportCode: airportCode.uppercased(),
             category: selectedCategory,
             title: title,
             body: tipBody,
             authorId: user.id,
-            authorName: user.displayName
+            authorName: user.displayName,
+            photoUrl: photoUrl
         )
 
         do {
@@ -598,5 +702,32 @@ struct AddLayoverTipView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func loadSelectedPhoto(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        let loaded: UIImage? = await Task.detached {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else { return nil }
+            return image
+        }.value
+        selectedImage = loaded
+    }
+
+    private func compressedPhotoData(_ image: UIImage) -> Data? {
+        let maxSize: CGFloat = 800
+        let size = image.size
+        let scale: CGFloat
+        if size.width > maxSize || size.height > maxSize {
+            scale = min(maxSize / size.width, maxSize / size.height)
+        } else {
+            scale = 1.0
+        }
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        return resized.jpegData(compressionQuality: 0.7)
     }
 }

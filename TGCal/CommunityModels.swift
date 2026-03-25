@@ -103,6 +103,7 @@ struct LayoverTip: Codable, Identifiable, Equatable, Hashable {
     var downvotes: Int
     let createdAt: Date?
     var updatedAt: Date?
+    var photoUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -113,6 +114,7 @@ struct LayoverTip: Codable, Identifiable, Equatable, Hashable {
         case upvotes, downvotes
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case photoUrl = "photo_url"
     }
 
     var score: Int { upvotes - downvotes }
@@ -168,12 +170,14 @@ struct NewLayoverTip: Codable {
     let body: String
     let authorId: UUID
     let authorName: String
+    var photoUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case airportCode = "airport_code"
         case category, title, body
         case authorId = "author_id"
         case authorName = "author_name"
+        case photoUrl = "photo_url"
     }
 }
 
@@ -189,60 +193,6 @@ struct LayoverVote: Codable {
     }
 }
 
-// MARK: - Commute Tracker
-
-struct CommuteRecord: Codable, Identifiable, Equatable {
-    var id: UUID
-    var date: Date
-    var fromCity: String
-    var toCity: String
-    var mode: CommuteMode
-    var durationMinutes: Int
-    var cost: Double
-    var currency: String
-    var note: String?
-
-    var costText: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 0
-        let formatted = formatter.string(from: NSNumber(value: cost)) ?? "\(Int(cost))"
-        return "\(formatted) \(currency)"
-    }
-}
-
-enum CommuteMode: String, Codable, CaseIterable, Identifiable {
-    case flight
-    case train
-    case bus
-    case taxi
-    case car
-    case other
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .flight: return "Flight"
-        case .train: return "Train"
-        case .bus: return "Bus"
-        case .taxi: return "Taxi"
-        case .car: return "Car"
-        case .other: return "Other"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .flight: return "airplane"
-        case .train: return "tram"
-        case .bus: return "bus"
-        case .taxi: return "car"
-        case .car: return "car.side"
-        case .other: return "figure.walk"
-        }
-    }
-}
 
 // MARK: - Shared Roster
 
@@ -375,5 +325,29 @@ struct CalendarDayEvents: Identifiable {
 
     var isDayOff: Bool {
         events.isEmpty || events.allSatisfy { if case .dayOff = $0 { return true }; return false }
+    }
+
+    /// Destination codes for flights (e.g. ["HKG", "NRT"])
+    var flightDestinations: [String] {
+        events.compactMap {
+            if case .flight(let r) = $0 { return r.destination ?? "???" }
+            return nil
+        }
+    }
+
+    /// Duty codes (e.g. ["SBY", "LD"])
+    var dutyCodes: [String] {
+        events.compactMap {
+            if case .duty(let r) = $0 { return r.flightNumber.uppercased() }
+            return nil
+        }
+    }
+
+    /// Swap destinations
+    var swapDestinations: [String] {
+        events.compactMap {
+            if case .swap(let s) = $0 { return s.destination }
+            return nil
+        }
     }
 }

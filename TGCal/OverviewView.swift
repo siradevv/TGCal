@@ -8,6 +8,7 @@ struct OverviewView: View {
 
     @State private var isShowingDestinationHistory = false
     @State private var rateTables: [PPBSeason: PPBRateTable] = [:]
+    @AppStorage("selectedCrewRank") private var selectedRank: PPBRank = .scc
     @State private var isShowingPDFImporter = false
     @State private var isProcessingSchedule = false
     @State private var alertContext: OverviewAlertContext?
@@ -290,6 +291,7 @@ struct OverviewView: View {
         return EarningsCalculator.calculate(
             for: month,
             season: season,
+            rank: selectedRank,
             tables: rateTables
         ).totalTHB
     }
@@ -483,9 +485,11 @@ struct OverviewView: View {
 
     private func exportEarnings(for month: RosterMonthRecord, format: ExportFormat) {
         let summary = monthSummary(for: month)
+        let season: PPBSeason = (month.month >= 4 && month.month <= 10) ? .summer : .winter
         let earningsResult = EarningsCalculator.calculate(
             for: month,
-            season: .summer,
+            season: season,
+            rank: selectedRank,
             tables: rateTables
         )
 

@@ -78,6 +78,28 @@ final class LayoverService: ObservableObject {
         return created
     }
 
+    // MARK: - Photo Upload
+
+    func uploadTipPhoto(imageData: Data, userId: UUID) async throws -> String {
+        let photoId = UUID().uuidString.lowercased()
+        let path = "\(userId.uuidString.lowercased())/\(photoId).jpg"
+
+        try await client.storage
+            .from("layover_photos")
+            .upload(
+                path: path,
+                file: imageData,
+                options: .init(contentType: "image/jpeg", upsert: false)
+            )
+
+        let publicURL = try client.storage
+            .from("layover_photos")
+            .getPublicURL(path: path)
+            .absoluteString
+
+        return publicURL
+    }
+
     // MARK: - Voting
 
     func hasVoted(tipId: UUID) -> Bool {

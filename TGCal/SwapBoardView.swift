@@ -14,6 +14,7 @@ struct SwapBoardView: View {
     @State private var isShowingConversations = false
     @State private var isLoading = false
     @State private var selectedListing: SwapListing?
+    @State private var listingToDelete: SwapListing?
 
     var body: some View {
         NavigationStack {
@@ -73,6 +74,22 @@ struct SwapBoardView: View {
             .task {
                 await supabase.restoreSession()
             }
+            .alert("Delete Listing", isPresented: Binding(
+                get: { listingToDelete != nil },
+                set: { if !$0 { listingToDelete = nil } }
+            )) {
+                Button("Delete", role: .destructive) {
+                    if let listing = listingToDelete {
+                        Task {
+                            try? await swapService.deleteListing(listing.id)
+                            listingToDelete = nil
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) { listingToDelete = nil }
+            } message: {
+                Text("This listing will be permanently removed from the Swap Board.")
+            }
         }
     }
 
@@ -116,14 +133,10 @@ struct SwapBoardView: View {
                 TextField("Search flights, routes...", text: $searchText)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
-                    .onSubmit {
-                        Task { await loadListings() }
-                    }
 
                 if searchText.isEmpty == false {
                     Button {
                         searchText = ""
-                        Task { await loadListings() }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.subheadline)
@@ -158,39 +171,29 @@ struct SwapBoardView: View {
     private var filterChips: some View {
         Group {
             if isShowingFilters {
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
-                        DatePicker(
-                            "From",
-                            selection: Binding(
-                                get: { filterDate ?? Date() },
-                                set: { filterDate = $0 }
-                            ),
-                            displayedComponents: .date
-                        )
-                        .datePickerStyle(.compact)
-                        .font(.subheadline)
-
-                        if filterDate != nil {
-                            Button("Clear") {
-                                filterDate = nil
-                                Task { await loadListings() }
-                            }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(TGTheme.indigo)
-                        }
-                    }
-
-                    Button {
+                HStack(spacing: 10) {
+                    DatePicker(
+                        "From",
+                        selection: Binding(
+                            get: { filterDate ?? Date() },
+                            set: { filterDate = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+                    .font(.subheadline)
+                    .onChange(of: filterDate) { _, _ in
                         Task { await loadListings() }
-                    } label: {
-                        Text("Apply Filters")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(TGTheme.indigo)
+
+                    if filterDate != nil {
+                        Button("Clear") {
+                            filterDate = nil
+                            Task { await loadListings() }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TGTheme.indigo)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -225,17 +228,31 @@ struct SwapBoardView: View {
         }
     }
 
-    /// Only show listings where departure is >24 hours away.
+    /// Only show listings where departure is >24 hours away, filtered by search text.
     private var swappableListings: [SwapListing] {
-        swapService.listings.filter { swapService.isSwappable($0) }
+        let base = swapService.listings.filter { swapService.isSwappable($0) }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !query.isEmpty else { return base }
+        return base.filter { listing in
+            listing.flightCode.uppercased().contains(query)
+            || listing.origin.uppercased().contains(query)
+            || listing.destination.uppercased().contains(query)
+            || listing.postedByName.uppercased().contains(query)
+            || (listing.returnFlightCode?.uppercased().contains(query) ?? false)
+            || (listing.returnOrigin?.uppercased().contains(query) ?? false)
+            || (listing.returnDestination?.uppercased().contains(query) ?? false)
+        }
     }
 
     private var listingsScrollView: some View {
         ScrollView {
             LazyVStack(spacing: 10) {
                 ForEach(swappableListings) { listing in
-                    SwapListingCard(listing: listing) {
+                    let isOwn = listing.postedBy == supabase.currentUser?.id
+                    SwapListingCard(listing: listing, isOwn: isOwn) {
                         selectedListing = listing
+                    } onDelete: {
+                        listingToDelete = listing
                     }
                 }
             }
@@ -266,16 +283,30 @@ struct SwapBoardView: View {
 
 struct SwapListingCard: View {
     let listing: SwapListing
+    var isOwn: Bool = false
     let onTap: () -> Void
+    var onDelete: (() -> Void)?
 
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 8) {
+                // Outbound leg
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(listing.flightCode)
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(TGTheme.indigo)
+                        HStack(spacing: 6) {
+                            Text(listing.flightCode)
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(TGTheme.indigo)
+
+                            if isOwn {
+                                Text("You")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(TGTheme.indigo))
+                            }
+                        }
 
                         Text(listing.routeText)
                             .font(.title3.weight(.semibold))
@@ -298,6 +329,41 @@ struct SwapListingCard: View {
                     }
                 }
 
+                // Return leg
+                if listing.isRoundTrip, let returnCode = listing.returnFlightCode, let returnRoute = listing.returnRouteText {
+                    HStack(alignment: .top) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.turn.down.right")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(returnCode)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(TGTheme.indigo.opacity(0.7))
+                                Text(returnRoute)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            if let returnDate = listing.returnDisplayDate {
+                                Text(returnDate)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let returnTime = listing.returnDepartureTime {
+                                Text("DEP \(returnTime)")
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                }
+
                 if let note = listing.note, note.isEmpty == false {
                     Text(note)
                         .font(.subheadline)
@@ -314,6 +380,17 @@ struct SwapListingCard: View {
                         .foregroundStyle(.tertiary)
 
                     Spacer()
+
+                    if isOwn, let onDelete {
+                        Button {
+                            onDelete()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))

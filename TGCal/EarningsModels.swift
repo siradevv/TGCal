@@ -14,9 +14,31 @@ enum PPBSeason: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum PPBRank: String, CaseIterable, Identifiable, Codable {
+    case cc
+    case scc
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .scc: return "SCC"
+        case .cc: return "CC"
+        }
+    }
+
+    var ppbDeduction: Int {
+        switch self {
+        case .scc: return 0
+        case .cc: return 100
+        }
+    }
+}
+
 struct PPBRateTable: Equatable {
     var season: PPBSeason
     var ppbByFlight: [String: Int]
+    var secondaryPairingFlights: Set<String> = []
 }
 
 struct EarningsLineItem: Identifiable, Equatable {

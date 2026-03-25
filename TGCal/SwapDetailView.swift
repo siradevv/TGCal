@@ -41,6 +41,30 @@ struct SwapDetailView: View {
                     }
                     .tgOverviewCard(verticalPadding: 14)
 
+                    // Return flight card
+                    if listing.isRoundTrip {
+                        VStack(alignment: .leading, spacing: 12) {
+                            TGSectionHeader(title: "Return Flight", systemImage: "airplane.arrival")
+
+                            if let code = listing.returnFlightCode {
+                                detailRow(title: "Flight", value: code)
+                                Divider()
+                            }
+                            if let route = listing.returnRouteText {
+                                detailRow(title: "Route", value: route)
+                                Divider()
+                            }
+                            if let date = listing.returnDisplayDate {
+                                detailRow(title: "Date", value: date)
+                            }
+                            if let time = listing.returnDepartureTime {
+                                Divider()
+                                detailRow(title: "Departure", value: time)
+                            }
+                        }
+                        .tgOverviewCard(verticalPadding: 14)
+                    }
+
                     // Note
                     if let note = listing.note, note.isEmpty == false {
                         VStack(alignment: .leading, spacing: 8) {

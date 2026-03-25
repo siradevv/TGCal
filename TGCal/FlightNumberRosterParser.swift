@@ -251,6 +251,8 @@ final class FlightNumberRosterParser {
             let raw = ns.substring(with: captureRange)
             let normalized = raw.strippingLeadingZeros()
             guard normalized != "0" else { continue }
+            // Reject single-digit numbers — TG flights are always 2+ digits
+            guard let value = Int(normalized), value >= 10 else { continue }
             numbers.append(normalized)
         }
 

@@ -5,6 +5,7 @@ struct LogbookView: View {
     @EnvironmentObject private var store: TGCalStore
 
     @State private var rateTables: [PPBSeason: PPBRateTable] = [:]
+    @AppStorage("selectedCrewRank") private var selectedRank: PPBRank = .scc
 
     var body: some View {
         NavigationStack {
@@ -505,6 +506,7 @@ struct LogbookView: View {
             let result = EarningsCalculator.calculate(
                 for: month,
                 season: season,
+                rank: selectedRank,
                 tables: rateTables
             )
 

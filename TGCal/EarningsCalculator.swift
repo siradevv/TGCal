@@ -63,6 +63,7 @@ struct EarningsCalculator {
     static func calculate(
         for month: RosterMonthRecord,
         season: PPBSeason,
+        rank: PPBRank = .scc,
         tables: [PPBSeason: PPBRateTable]
     ) -> MonthEarningsResult {
         let table = tables[season] ?? PPBRateTable(season: season, ppbByFlight: [:])
@@ -79,6 +80,11 @@ struct EarningsCalculator {
 
                 let rawFlight = detail.flightNumber.isEmpty ? key : detail.flightNumber
                 guard let normalizedFlight = normalizeFlightNumber(rawFlight) else {
+                    continue
+                }
+
+                // Skip secondary pairing flights (counted via the primary flight)
+                if table.secondaryPairingFlights.contains(normalizedFlight) {
                     continue
                 }
 
@@ -104,24 +110,26 @@ struct EarningsCalculator {
             return lhs < rhs
         }
 
+        let deduction = rank.ppbDeduction
         var lineItems: [EarningsLineItem] = []
         var missingFlights: [String: Int] = [:]
 
         for flight in sortedFlights {
             let count = flightCounts[flight, default: 0]
-            let ppb = table.ppbByFlight[flight]
-            let subtotal = count * (ppb ?? 0)
+            let basePPB = table.ppbByFlight[flight]
+            let adjustedPPB = basePPB.map { max(0, $0 - deduction) }
+            let subtotal = count * (adjustedPPB ?? 0)
 
             lineItems.append(
                 EarningsLineItem(
                     flightNumber: flight,
                     count: count,
-                    ppb: ppb,
+                    ppb: adjustedPPB,
                     subtotal: subtotal
                 )
             )
 
-            if ppb == nil {
+            if basePPB == nil {
                 missingFlights[flight] = count
             }
         }
@@ -152,6 +160,7 @@ struct EarningsCalculator {
 
     private static func buildTable(for season: PPBSeason, from seasonDTO: SeasonRatesDTO) -> PPBRateTable {
         var map: [String: Int] = [:]
+        var secondaryFlights: Set<String> = []
 
         for item in seasonDTO.singleFlights {
             guard let normalized = normalizeFlightNumber(item.flight) else { continue }
@@ -159,13 +168,20 @@ struct EarningsCalculator {
         }
 
         for pairing in seasonDTO.pairings {
-            for flight in pairing.flights {
-                guard let normalized = normalizeFlightNumber(flight) else { continue }
-                map[normalized] = pairing.ppb
+            let normalizedFlights = pairing.flights.compactMap { normalizeFlightNumber($0) }
+            guard let primary = normalizedFlights.first else { continue }
+
+            // Only the first flight in the pairing gets the PPB entry.
+            // All others are secondary — they'll be skipped during calculation.
+            map[primary] = pairing.ppb
+
+            for flight in normalizedFlights.dropFirst() {
+                secondaryFlights.insert(flight)
+                map.removeValue(forKey: flight)
             }
         }
 
-        return PPBRateTable(season: season, ppbByFlight: map)
+        return PPBRateTable(season: season, ppbByFlight: map, secondaryPairingFlights: secondaryFlights)
     }
 
     private static func resolveDetail(

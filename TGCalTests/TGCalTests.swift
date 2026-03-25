@@ -1,4 +1,5 @@
 import XCTest
+import PDFKit
 @testable import TGCal
 
 final class TGCalTests: XCTestCase {
@@ -170,7 +171,7 @@ final class TGCalTests: XCTestCase {
     }
 
     func testSchedulePDFExtractsStandbyDutyCodeForMarch3() async throws {
-        let pdfURL = URL(fileURLWithPath: "/Users/sira27/Downloads/individual-report.pdf")
+        let pdfURL = URL(fileURLWithPath: "/Users/sira27/Desktop/roster/individual-report.pdf")
         guard FileManager.default.fileExists(atPath: pdfURL.path) else {
             throw XCTSkip("PDF not found at \(pdfURL.path)")
         }
@@ -205,8 +206,53 @@ final class TGCalTests: XCTestCase {
         XCTAssertTrue(invalidDutyCodes.isEmpty, "Airport code should never be used as duty code")
     }
 
+    // MARK: - April 2026 PDF Tests
+
+    func testAprilPDFFullParse() async throws {
+        let pdfURL = URL(fileURLWithPath: "/Users/sira27/Desktop/roster/April.pdf")
+        guard FileManager.default.fileExists(atPath: pdfURL.path) else {
+            throw XCTSkip("April PDF not found at \(pdfURL.path)")
+        }
+
+        let pdfData = try Data(contentsOf: pdfURL)
+        let service = ScheduleSlipService()
+        let parsed = try await service.parse(pdfData: pdfData, fallbackMonth: 4, fallbackYear: 2026)
+
+        func dayFlights(_ day: Int) -> Set<String> {
+            let entries = parsed.flightsByDay[day] ?? []
+            return Set(entries.compactMap { parsed.detailsByFlight[$0]?.flightNumber })
+        }
+
+        let allFlightNumbers = Set(parsed.detailsByFlight.values.map(\.flightNumber))
+
+        // No bogus single-digit flight numbers
+        XCTAssertFalse(allFlightNumbers.contains("1"), "Should not have flight number '1'")
+
+        // TRG training on days 7-10
+        XCTAssertTrue(dayFlights(7).contains("TRG"), "Day 7 should have TRG, got: \(dayFlights(7))")
+        XCTAssertTrue(dayFlights(8).contains("TRG"), "Day 8 should have TRG, got: \(dayFlights(8))")
+        XCTAssertTrue(dayFlights(9).contains("TRG"), "Day 9 should have TRG, got: \(dayFlights(9))")
+        XCTAssertTrue(dayFlights(10).contains("TRG"), "Day 10 should have TRG, got: \(dayFlights(10))")
+
+        // Key flights exist with correct routes
+        XCTAssertTrue(allFlightNumbers.contains("676"), "Should have TG 676")
+        XCTAssertTrue(allFlightNumbers.contains("677"), "Should have TG 677")
+        XCTAssertTrue(allFlightNumbers.contains("672"), "Should have TG 672")
+        XCTAssertTrue(allFlightNumbers.contains("673"), "Should have TG 673")
+        XCTAssertTrue(allFlightNumbers.contains("102"), "Should have TG 102")
+        XCTAssertTrue(allFlightNumbers.contains("103"), "Should have TG 103")
+        XCTAssertTrue(allFlightNumbers.contains("570"), "Should have TG 570")
+        XCTAssertTrue(allFlightNumbers.contains("571"), "Should have TG 571")
+        XCTAssertTrue(allFlightNumbers.contains("624"), "Should have TG 624")
+        XCTAssertTrue(allFlightNumbers.contains("625"), "Should have TG 625")
+        XCTAssertTrue(allFlightNumbers.contains("920"), "Should have TG 920")
+        XCTAssertTrue(allFlightNumbers.contains("921"), "Should have TG 921")
+        XCTAssertTrue(allFlightNumbers.contains("343"), "Should have TG 343")
+        XCTAssertTrue(allFlightNumbers.contains("344"), "Should have TG 344")
+    }
+
     func testSchedulePDFExtractsExpectedMarchMapping() async throws {
-        let pdfURL = URL(fileURLWithPath: "/Users/sira27/Downloads/individual-report.pdf")
+        let pdfURL = URL(fileURLWithPath: "/Users/sira27/Desktop/roster/individual-report.pdf")
         guard FileManager.default.fileExists(atPath: pdfURL.path) else {
             throw XCTSkip("PDF not found at \(pdfURL.path)")
         }

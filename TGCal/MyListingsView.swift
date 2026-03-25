@@ -96,6 +96,27 @@ struct MyListingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            // Return leg
+            if listing.isRoundTrip, let returnCode = listing.returnFlightCode, let returnRoute = listing.returnRouteText {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.turn.down.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(returnCode)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TGTheme.indigo.opacity(0.7))
+                    Text(returnRoute)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    if let returnDate = listing.returnDisplayDate {
+                        Spacer()
+                        Text(returnDate)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             if let note = listing.note, note.isEmpty == false {
                 Text(note)
                     .font(.caption)

@@ -50,7 +50,7 @@ final class SwapService: ObservableObject {
                 .replacingOccurrences(of: ")", with: "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if sanitized.isEmpty == false {
-                query = query.or("flight_code.ilike.%\(sanitized)%,destination.ilike.%\(sanitized)%,origin.ilike.%\(sanitized)%")
+                query = query.or("flight_code.ilike.%\(sanitized)%,destination.ilike.%\(sanitized)%,origin.ilike.%\(sanitized)%,return_flight_code.ilike.%\(sanitized)%,return_destination.ilike.%\(sanitized)%,return_origin.ilike.%\(sanitized)%")
             }
         }
 
@@ -96,6 +96,17 @@ final class SwapService: ObservableObject {
         if let index = myListings.firstIndex(where: { $0.id == listingId }) {
             myListings[index].status = .cancelled
         }
+        listings.removeAll { $0.id == listingId }
+    }
+
+    func deleteListing(_ listingId: UUID) async throws {
+        try await client
+            .from("swap_listings")
+            .delete()
+            .eq("id", value: listingId.uuidString)
+            .execute()
+
+        myListings.removeAll { $0.id == listingId }
         listings.removeAll { $0.id == listingId }
     }
 
@@ -177,18 +188,28 @@ final class SwapService: ObservableObject {
         let field = isInitiator ? "initiator_confirmed" : "owner_confirmed"
         let otherConfirmed = isInitiator ? conversation.ownerConfirmed : conversation.initiatorConfirmed
 
-        var updates: [String: String] = [field: "true"]
+        // Build typed update payload (booleans must encode as JSON true/false, not strings)
+        struct ConfirmUpdate: Encodable {
+            var initiator_confirmed: Bool?
+            var owner_confirmed: Bool?
+            var status: String?
+        }
 
-        // If both parties confirmed, mark as confirmed
         let bothConfirmed = otherConfirmed
+        var payload = ConfirmUpdate()
+        if isInitiator {
+            payload.initiator_confirmed = true
+        } else {
+            payload.owner_confirmed = true
+        }
         if bothConfirmed {
-            updates["status"] = "confirmed"
+            payload.status = "confirmed"
         }
 
         // Update conversation first
         try await client
             .from("conversations")
-            .update(updates)
+            .update(payload)
             .eq("id", value: conversationId.uuidString)
             .execute()
 
@@ -212,9 +233,14 @@ final class SwapService: ObservableObject {
     func cancelSwap(conversationId: UUID) async throws {
         guard SupabaseService.shared.currentUser?.id != nil else { return }
 
+        struct CancelUpdate: Encodable {
+            let status = "cancelled"
+            let initiator_confirmed = false
+            let owner_confirmed = false
+        }
         try await client
             .from("conversations")
-            .update(["status": "cancelled", "initiator_confirmed": "false", "owner_confirmed": "false"])
+            .update(CancelUpdate())
             .eq("id", value: conversationId.uuidString)
             .execute()
 
@@ -275,7 +301,7 @@ final class SwapService: ObservableObject {
             .from("conversations")
             .update([
                 "last_message": text,
-                "last_message_at": ISO8601DateFormatter().string(from: Date())
+                "last_message_at": Self.iso8601Formatter.string(from: Date())
             ])
             .eq("id", value: conversationId.uuidString)
             .execute()
@@ -289,12 +315,13 @@ final class SwapService: ObservableObject {
     func markMessagesAsRead(conversationId: UUID) async throws {
         guard let userId = SupabaseService.shared.currentUser?.id else { return }
 
+        struct ReadUpdate: Encodable { let is_read = true }
         try await client
             .from("messages")
-            .update(["is_read": "true"])
+            .update(ReadUpdate())
             .eq("conversation_id", value: conversationId.uuidString)
             .neq("sender_id", value: userId.uuidString)
-            .eq("is_read", value: "false")
+            .eq("is_read", value: false)
             .execute()
     }
 
@@ -353,6 +380,11 @@ final class SwapService: ObservableObject {
         // If no departure time, use end of day as conservative estimate
         return Calendar.roster.date(bySettingHour: 23, minute: 59, second: 0, of: baseDate) ?? baseDate
     }
+
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        return f
+    }()
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()

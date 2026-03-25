@@ -28,13 +28,21 @@ struct TGCalApp: App {
                 }
             }
             .onAppear {
+                WidgetDataService.updateNextFlight(from: store.months)
+            }
+            .task {
+                // Restore Supabase session on launch
+                await SupabaseService.shared.restoreSession()
+
+                // Only request local notification permission if user enabled reminders
                 if UserDefaults.standard.bool(forKey: "reminders_enabled") {
                     NotificationService.shared.requestPermission()
                 }
-                WidgetDataService.updateNextFlight(from: store.months)
 
-                // Register for push notifications
-                PushNotificationManager.shared.requestPermissionAndRegister()
+                // Request push notification permission only after auth (better UX)
+                if SupabaseService.shared.isAuthenticated {
+                    PushNotificationManager.shared.requestPermissionAndRegister()
+                }
             }
         }
     }

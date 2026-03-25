@@ -252,8 +252,14 @@ struct AuthView: View {
                 errorMessage = error.localizedDescription
             }
         case .failure(let error):
-            // User cancelled — don't show error
-            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            let asError = error as? ASAuthorizationError
+            // User cancelled or dismissed — don't show error
+            if asError?.code == .canceled { return }
+            // Unknown error (often means capability not configured)
+            if asError?.code == .unknown {
+                errorMessage = "Sign in with Apple is not available. Please use email or check that Sign in with Apple is enabled in Apple Developer portal."
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

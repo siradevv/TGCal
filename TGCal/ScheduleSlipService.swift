@@ -176,7 +176,14 @@ struct ScheduleSlipService {
         let monthYear = detectMonthYear(in: rawText)
             ?? (month: fallbackMonth, year: fallbackYear)
 
-        var detailsByFlight = parseFlightDetails(in: rawText)
+        // Try position-based parsing first (handles Thai Airways roster layout correctly)
+        var detailsByFlight = parseFlightDetailsFromPDFPage(page: firstPage, month: monthYear.month, year: monthYear.year)
+
+        // Fallback to regex-based parsing if position-based found nothing
+        if detailsByFlight.isEmpty {
+            detailsByFlight = parseFlightDetails(in: rawText)
+        }
+
         var flightsByDay: [Int: [String]] = [:]
         var ocrLines: [OCRLine] = []
         var ocrText = ""
@@ -188,6 +195,21 @@ struct ScheduleSlipService {
                 year: monthYear.year,
                 validFlightNumbers: Set(detailsByFlight.keys)
             )
+
+            // Add duty entries (e.g. __DUTY_5_TRG) directly to flightsByDay.
+            // These have the day encoded in their key, so no grid search needed.
+            for key in detailsByFlight.keys where isDutyKey(key) {
+                // Parse day from "__DUTY_{day}_{code}"
+                // split(separator: "_") omits empty subsequences, so
+                // "__DUTY_7_TRG" → ["DUTY", "7", "TRG"] — day is at index 1.
+                let parts = key.split(separator: "_").map(String.init)
+                guard parts.count >= 3, let day = Int(parts[1]) else { continue }
+                var dayEntries = flightsByDay[day, default: []]
+                if !dayEntries.contains(key) {
+                    dayEntries.append(key)
+                    flightsByDay[day] = dayEntries
+                }
+            }
         }
 
         if let renderedImage = render(page: firstPage, scale: 3.0) {
@@ -1425,6 +1447,9 @@ struct ScheduleSlipService {
             .compactMap { token -> (number: String, yDelta: CGFloat, x: CGFloat)? in
                 let normalized = token.text.strippingLeadingZeros()
                 guard normalized.isEmpty == false, normalized != "0" else { return nil }
+                // Reject single-digit numbers — TG flights are 2+ digits (e.g. TG 102).
+                // Stray "1", "2" etc. are misread day labels or OCR artifacts.
+                guard let value = Int(normalized), value >= 10 else { return nil }
                 return (number: normalized, yDelta: abs(token.y - y), x: token.x)
             }
             .sorted {
@@ -2037,6 +2062,256 @@ struct ScheduleSlipService {
         return linkedClusters.sorted(by: >)
     }
 
+    // MARK: - Position-Based Flight Detail Parsing
+
+    /// Parses the FLT/DEP/ARR detail table from the PDF page using token positions.
+    /// This avoids the text-flattening issue where regex matches across row boundaries.
+    private func parseFlightDetailsFromPDFPage(page: PDFPage, month: Int = 0, year: Int = 0) -> [String: ScheduleFlightDetail] {
+        let tokens = extractPDFTokens(from: page)
+        guard tokens.isEmpty == false else { return [:] }
+
+        // Build day bounds for duty code day assignment
+        let pdfDayHeaders = extractPDFDayHeaders(from: tokens, month: month, year: year)
+        let pdfDayCenters = buildDayCenters(headers: pdfDayHeaders, month: month, year: year)
+        let pdfDayBounds = buildUnclampedDayBounds(from: pdfDayCenters)
+
+        // Find FLT/DEP/ARR label tokens (always at x < 80, on the left side)
+        let fltLabels = tokens
+            .filter { normalizedLine($0.text) == "FLT" && $0.x < 80 }
+            .sorted(by: { $0.y > $1.y }) // PDFKit: higher y = higher on page
+        let depLabels = tokens
+            .filter { normalizedLine($0.text) == "DEP" && $0.x < 80 }
+            .sorted(by: { $0.y > $1.y })
+        let arrLabels = tokens
+            .filter { normalizedLine($0.text) == "ARR" && $0.x < 80 }
+            .sorted(by: { $0.y > $1.y })
+
+        guard fltLabels.isEmpty == false else { return [:] }
+
+        var result: [String: ScheduleFlightDetail] = [:]
+        var usedDepYs: Set<Int> = []
+        var usedArrYs: Set<Int> = []
+
+        for fltLabel in fltLabels {
+            // Find the DEP label closest below the FLT label (lower y in PDFKit)
+            // Skip labels already claimed by a previous FLT block.
+            guard let depLabel = depLabels.first(where: {
+                $0.y < fltLabel.y && (fltLabel.y - $0.y) < 40
+                && !usedDepYs.contains(Int($0.y * 1000))
+            }) else { continue }
+
+            // Find the ARR label closest below DEP
+            guard let arrLabel = arrLabels.first(where: {
+                $0.y < depLabel.y && (depLabel.y - $0.y) < 40
+                && !usedArrYs.contains(Int($0.y * 1000))
+            }) else { continue }
+
+            usedDepYs.insert(Int(depLabel.y * 1000))
+            usedArrYs.insert(Int(arrLabel.y * 1000))
+
+            // PDFKit: origin at bottom-left, y increases upward.
+            // Layout per block: FLT data → FLT label → DEP data → DEP label → ARR data → ARR label → ARR times
+            // Note: ARR times can extend BELOW the ARR label.
+
+            let fltMidY = fltLabel.y
+            let depMidY = depLabel.y
+            let arrMidY = arrLabel.y
+
+            // Extract tokens in the data area (x >= 80, in the grid columns)
+            let dataTokens = tokens.filter { $0.x >= 80 }
+
+            // FLT row: tokens near the fltLabel y-level (within ±4 units, or up to 8 above)
+            let fltRowTokens = dataTokens
+                .filter { abs($0.y - fltMidY) < 4 || ($0.y > fltMidY && ($0.y - fltMidY) < 8) }
+                .sorted(by: { $0.x < $1.x })
+
+            // DEP band: all tokens between FLT label and DEP label (with a small margin)
+            let depBandTokens = dataTokens
+                .filter { $0.y < (fltMidY - 2) && $0.y > depMidY }
+                .sorted(by: { $0.x < $1.x })
+
+            // ARR band: all tokens between DEP label and below ARR label (within 10 below)
+            let arrBandTokens = dataTokens
+                .filter { $0.y < depMidY && $0.y > (arrMidY - 10) }
+                .sorted(by: { $0.x < $1.x })
+
+            // Use x-proximity matching instead of index-based matching.
+            // Index matching breaks when duty codes (TRG, SBY) in the FLT row
+            // have no airport codes in the DEP band, causing array length mismatches.
+            let depOrigins = depBandTokens.filter { isAirportCodeToken($0.text.uppercased()) }
+            let depTimes = depBandTokens.filter { isTimeToken($0.text) }
+            let arrDests = arrBandTokens.filter { isAirportCodeToken($0.text.uppercased()) }
+            let arrTimes = arrBandTokens.filter { isTimeToken($0.text) }
+
+            // Estimate column width from day headers for ARR tolerance (overnight flights
+            // have ARR data in the next day's column, so allow wider x-search)
+            let estimatedColumnWidth: CGFloat = fltRowTokens.count >= 2
+                ? (fltRowTokens.last!.x - fltRowTokens.first!.x) / CGFloat(fltRowTokens.count - 1)
+                : 30.0
+
+            for fltToken in fltRowTokens {
+                guard let flightNumber = normalizeFlightNumberToken(fltToken.text) else { continue }
+                guard result[flightNumber] == nil else { continue }
+
+                let fx = fltToken.x
+                let depProximity: CGFloat = 15.0
+                let arrProximity: CGFloat = max(20.0, estimatedColumnWidth * 1.5)
+
+                // Find nearest DEP origin and time by x-proximity (same column)
+                guard let origin = depOrigins.min(by: { abs($0.x - fx) < abs($1.x - fx) }),
+                      abs(origin.x - fx) < depProximity else { continue }
+                guard let depTime = depTimes.min(by: { abs($0.x - fx) < abs($1.x - fx) }),
+                      abs(depTime.x - fx) < depProximity else { continue }
+
+                // For ARR, only search RIGHTWARD (same column or next day).
+                // Overnight flights have arrival data in the next day's column (higher x).
+                // Without this filter, a previous flight's arrival (to the left) can be
+                // fractionally closer and incorrectly matched (e.g. TG 325 BKK→BKK instead of BKK→BLR).
+                let arrDestsRight = arrDests.filter { $0.x >= fx - 5 }
+                let arrTimesRight = arrTimes.filter { $0.x >= fx - 5 }
+                guard let dest = arrDestsRight.min(by: { abs($0.x - fx) < abs($1.x - fx) }),
+                      abs(dest.x - fx) < arrProximity else { continue }
+                guard let arrTime = arrTimesRight.min(by: { abs($0.x - fx) < abs($1.x - fx) }),
+                      abs(arrTime.x - fx) < arrProximity else { continue }
+
+                result[flightNumber] = ScheduleFlightDetail(
+                    flightNumber: flightNumber,
+                    origin: origin.text.uppercased(),
+                    destination: dest.text.uppercased(),
+                    departureTime: normalizeDetailTime(depTime.text),
+                    arrivalTime: normalizeDetailTime(arrTime.text)
+                )
+            }
+
+            // Duty code detection: TRG, SBY, REST, OFF, etc. in the FLT row.
+            // These are alphabetic tokens that have NO origin airport nearby
+            // (flights always have an origin, duties only have times).
+            //
+            // IMPORTANT: Duty code times may NOT be in the DEP/ARR bands.
+            // Thai Airways rosters have a DUTY area ABOVE the FLT row (y > fltMidY)
+            // where duty codes and their times are stacked vertically per day column.
+            // We search both the DEP/ARR bands AND the DUTY area above.
+            if pdfDayBounds.isEmpty == false {
+                // Extract time tokens from the DUTY area above the FLT row.
+                // This area sits between the FLT row and the day headers (~60pt above).
+                let dutyAreaTimes = dataTokens
+                    .filter { $0.y > (fltMidY + 8) && $0.y < (fltMidY + 70) }
+                    .filter { isTimeToken($0.text) }
+
+                for fltToken in fltRowTokens {
+                    // Skip if it was already matched as a flight number
+                    if normalizeFlightNumberToken(fltToken.text) != nil { continue }
+
+                    let code = fltToken.text.uppercased()
+                        .replacingOccurrences(of: "[^A-Z]", with: "", options: .regularExpression)
+                    guard (2...10).contains(code.count),
+                          code.allSatisfy({ $0 >= "A" && $0 <= "Z" }),
+                          !isExcludedDutyToken(code) else { continue }
+
+                    let fx = fltToken.x
+                    guard let day = dayForX(fx, in: pdfDayBounds) else { continue }
+
+                    // If there's an origin airport near this x-position, it's likely
+                    // a misread flight, not a duty code — skip it.
+                    let nearOrigin = depOrigins.min(by: { abs($0.x - fx) < abs($1.x - fx) })
+                    if let origin = nearOrigin, abs(origin.x - fx) < 10 { continue }
+
+                    let dutyKey = "__DUTY_\(day)_\(code)"
+
+                    // Find nearest dep/arr times by x-proximity.
+                    // Try DEP/ARR bands first, then fall back to DUTY area above.
+                    let nearDepTime = depTimes.min(by: { abs($0.x - fx) < abs($1.x - fx) })
+                    let nearArrTime = arrTimes.min(by: { abs($0.x - fx) < abs($1.x - fx) })
+
+                    var depTimeStr: String?
+                    var arrTimeStr: String?
+
+                    // Strategy 1: DEP/ARR band times (standard FLT block layout)
+                    if let dep = nearDepTime, abs(dep.x - fx) < 20 {
+                        depTimeStr = normalizeDetailTime(dep.text)
+                    }
+                    if let arr = nearArrTime, abs(arr.x - fx) < 20 {
+                        arrTimeStr = normalizeDetailTime(arr.text)
+                    }
+
+                    // Strategy 2: DUTY area above FLT row (Thai Airways compact layout)
+                    // Times are stacked vertically per day column: dep at higher y, arr at lower y.
+                    if depTimeStr == nil || arrTimeStr == nil {
+                        let columnTimes = dutyAreaTimes
+                            .filter { abs($0.x - fx) < 8 }
+                            .sorted { $0.y > $1.y } // highest y first = earliest time (dep)
+
+                        if columnTimes.count >= 2 {
+                            if depTimeStr == nil {
+                                depTimeStr = normalizeDetailTime(columnTimes.first!.text)
+                            }
+                            if arrTimeStr == nil {
+                                arrTimeStr = normalizeDetailTime(columnTimes.last!.text)
+                            }
+                        } else if columnTimes.count == 1 {
+                            // Single time — use as both dep and arr
+                            let t = normalizeDetailTime(columnTimes[0].text)
+                            if depTimeStr == nil { depTimeStr = t }
+                            if arrTimeStr == nil { arrTimeStr = t }
+                        }
+                    }
+
+                    guard let finalDep = depTimeStr, let finalArr = arrTimeStr else { continue }
+
+                    // If duty key already exists (e.g. TRG has morning + afternoon sessions
+                    // in separate FLT blocks), extend the time range to cover all sessions.
+                    if let existing = result[dutyKey] {
+                        let earlierDep = min(existing.departureTime, finalDep)
+                        let laterArr = max(existing.arrivalTime, finalArr)
+                        result[dutyKey] = ScheduleFlightDetail(
+                            flightNumber: code,
+                            origin: "",
+                            destination: "",
+                            departureTime: earlierDep,
+                            arrivalTime: laterArr
+                        )
+                    } else {
+                        result[dutyKey] = ScheduleFlightDetail(
+                            flightNumber: code,
+                            origin: "",
+                            destination: "",
+                            departureTime: finalDep,
+                            arrivalTime: finalArr
+                        )
+                    }
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func isTimeToken(_ text: String) -> Bool {
+        let digits = text.filter(\.isNumber)
+        if digits.count == 4 || digits.count == 3 {
+            return true
+        }
+        if text.contains(":"), digits.count >= 3 {
+            return true
+        }
+        return false
+    }
+
+    private func normalizeDetailTime(_ text: String) -> String {
+        let digits = text.filter(\.isNumber)
+        let hhmm: String
+        if digits.count == 3 {
+            hhmm = "0" + digits
+        } else if digits.count == 4 {
+            hhmm = digits
+        } else {
+            return text
+        }
+        let h = String(hhmm.prefix(2))
+        let m = String(hhmm.suffix(2))
+        return "\(h):\(m)"
+    }
+
     private func clusterPDFTokensByY(
         _ tokens: [PDFToken],
         tolerance: CGFloat
@@ -2122,7 +2397,11 @@ struct ScheduleSlipService {
             .replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
         guard cleaned.isEmpty == false, cleaned.count <= 4 else { return nil }
         let normalized = cleaned.strippingLeadingZeros()
-        return normalized == "0" ? nil : normalized
+        guard normalized != "0" else { return nil }
+        // TG flights are 3+ digits (e.g. TG 102). Reject single-digit numbers
+        // which are almost always misread day labels or stray OCR artifacts.
+        guard let value = Int(normalized), value >= 10 else { return nil }
+        return normalized
     }
 
     private func extractDayHeaders(from lines: [OCRLine]) -> [DayHeader] {

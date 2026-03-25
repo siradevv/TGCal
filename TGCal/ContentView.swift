@@ -19,10 +19,13 @@ struct ContentView: View {
     @State private var isShowingExistingCalendarSheet = false
 
     @State private var selectedSeason: PPBSeason = .summer
+    @AppStorage("selectedPPBRank") private var selectedRank: PPBRank = .scc
     @State private var rateTables: [PPBSeason: PPBRateTable] = [:]
     @State private var loadErrorMessage: String?
 
     @State private var alertContext: AlertContext?
+    @State private var isShowingLogbook = false
+    @State private var isShowingShareRoster = false
     @FocusState private var isNewCalendarNameFocused: Bool
 
     var body: some View {
@@ -67,28 +70,27 @@ struct ContentView: View {
                                     .transition(.opacity)
                                 }
                             }
-                            .tgCard()
-                            .padding(.vertical, 2)
+                            .tgFrostedCard()
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
                     } else {
-                        Section {
-                            HStack(alignment: .center, spacing: 12) {
-                                Text(headerTitle)
-                                    .font(.largeTitle.weight(.semibold))
-
-                                Spacer(minLength: 8)
-
-                                monthSelectionIndicatorMenu
-                            }
-                            .padding(.vertical, 2)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                        }
-
+                        // MARK: - Header Card
                         Section {
                             VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .center, spacing: 12) {
+                                    Text(headerTitle)
+                                        .font(.largeTitle.weight(.semibold))
+
+                                    Spacer(minLength: 8)
+
+                                    monthSelectionIndicatorMenu
+                                }
+
+                                Text(headerSummary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
                                 if activeMonth != nil {
                                     Picker("Season", selection: $selectedSeason) {
                                         ForEach(PPBSeason.allCases) { season in
@@ -96,17 +98,49 @@ struct ContentView: View {
                                         }
                                     }
                                     .pickerStyle(.segmented)
+
+                                    Picker("Rank", selection: $selectedRank) {
+                                        ForEach(PPBRank.allCases) { rank in
+                                            Text(rank.displayName).tag(rank)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+
+                                if let result = earningsResult {
+                                    HStack(spacing: 8) {
+                                        Text("Estimated Earnings")
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.secondary)
+
+                                        Spacer()
+
+                                        Text(formatTHB(result.totalTHB))
+                                            .font(.title3.weight(.semibold))
+                                            .monospacedDigit()
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(TGTheme.insetFill)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .stroke(TGTheme.insetStroke, lineWidth: 1)
+                                            )
+                                    )
                                 }
 
                                 Button {
                                     isShowingPDFImporter = true
                                 } label: {
                                     Text(pdfButtonTitle)
-                                        .fontWeight(.semibold)
+                                        .font(.subheadline.weight(.semibold))
                                         .frame(maxWidth: .infinity, alignment: .center)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(themeIndigo)
+                                .controlSize(.regular)
                                 .disabled(isProcessingSchedule)
 
                                 if isProcessingSchedule {
@@ -118,142 +152,105 @@ struct ContentView: View {
                                     .font(.subheadline)
                                     .transition(.opacity)
                                 }
+
+                                // Calendar buttons
+                                HStack(spacing: 10) {
+                                    Button {
+                                        newCalendarName = ""
+                                        isShowingCreateCalendarSheet = true
+                                    } label: {
+                                        Label("New Calendar", systemImage: "plus.circle")
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(themeIndigo)
+                                    .controlSize(.regular)
+                                    .disabled(isAddingToCalendar || isProcessingSchedule)
+
+                                    Button {
+                                        Task {
+                                            await openExistingCalendarSheet()
+                                        }
+                                    } label: {
+                                        if isLoadingCalendars {
+                                            ProgressView()
+                                                .frame(maxWidth: .infinity)
+                                        } else {
+                                            Label("Existing", systemImage: "calendar")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(themeIndigo)
+                                    .controlSize(.regular)
+                                    .disabled(isAddingToCalendar || isProcessingSchedule || isLoadingCalendars)
+                                }
                             }
-                            .tgCard()
-                            .padding(.vertical, 2)
+                            .tgFrostedCard()
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
                     }
 
+                    // MARK: - Flight List
                     if lookupDayGroups.isEmpty == false {
                         Section {
-                            VStack(spacing: 6) {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(lookupDayGroups.enumerated()), id: \.offset) { index, group in
-                                        VStack(alignment: .leading, spacing: 12) {
-                                            Text(group.date.rosterDateText)
-                                                .font(.headline.weight(.semibold))
-                                                .foregroundStyle(themeIndigo)
+                            VStack(spacing: 0) {
+                                ForEach(Array(lookupDayGroups.enumerated()), id: \.offset) { index, group in
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text(group.date.rosterDateText)
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(themeIndigo)
 
-                                            ForEach(group.records) { record in
-                                                let earnings = estimatedEarningsTHB(for: record)
-                                                VStack(alignment: .leading, spacing: 6) {
-                                                    HStack(alignment: .center, spacing: 10) {
-                                                        if record.showsCodeBadge {
-                                                            Text(record.flightCode)
-                                                                .font(.caption.weight(.semibold))
-                                                                .foregroundStyle(themeIndigo)
-                                                                .padding(.horizontal, 10)
-                                                                .padding(.vertical, 5)
-                                                                .background(Capsule().fill(themeIndigo.opacity(0.14)))
-                                                        }
-
-                                                        Text(record.listPrimaryText)
-                                                            .font(.subheadline)
-                                                            .lineLimit(1)
-                                                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                                                        Text(record.scheduleText)
-                                                            .font(.subheadline.weight(.medium))
-                                                            .foregroundStyle(.secondary)
-                                                            .monospacedDigit()
+                                        ForEach(group.records) { record in
+                                            let earnings = estimatedEarningsTHB(for: record)
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                HStack(alignment: .center, spacing: 10) {
+                                                    if record.showsCodeBadge {
+                                                        Text(record.flightCode)
+                                                            .font(.caption.weight(.semibold))
+                                                            .foregroundStyle(themeIndigo)
                                                             .padding(.horizontal, 10)
-                                                            .padding(.vertical, 5)
-                                                            .background(Capsule().fill(themeRose.opacity(0.16)))
+                                                            .padding(.vertical, 4)
+                                                            .background(Capsule().fill(themeIndigo.opacity(0.14)))
                                                     }
 
-                                                    if earnings > 0 {
-                                                        HStack(spacing: 8) {
-                                                            Spacer()
+                                                    Text(record.listPrimaryText)
+                                                        .font(.subheadline)
+                                                        .lineLimit(1)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                                                            Text(formatTHB(earnings))
-                                                                .font(.caption.weight(.semibold))
-                                                                .foregroundStyle(themeIndigo)
-                                                                .monospacedDigit()
-                                                        }
-                                                    }
+                                                    Text(record.scheduleText)
+                                                        .font(.caption.weight(.medium))
+                                                        .foregroundStyle(.secondary)
+                                                        .monospacedDigit()
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 4)
+                                                        .background(Capsule().fill(themeRose.opacity(0.16)))
+                                                }
+
+                                                if earnings > 0 {
+                                                    Text(formatTHB(earnings))
+                                                        .font(.caption.weight(.semibold))
+                                                        .foregroundStyle(themeIndigo)
+                                                        .monospacedDigit()
+                                                        .frame(maxWidth: .infinity, alignment: .trailing)
                                                 }
                                             }
                                         }
-                                        .padding(.vertical, 12)
-
-                                        if index < lookupDayGroups.count - 1 {
-                                            Divider()
-                                        }
                                     }
-                                }
-                                .tgCard(cornerRadius: 16, verticalPadding: 12)
-                                .padding(.vertical, 2)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
+                                    .padding(.vertical, 10)
 
-                                if let result = earningsResult {
-                                    HStack(spacing: 10) {
-                                        Text("Estimated Total Earnings")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(themeIndigo)
-
-                                        Spacer()
-
-                                        Text(formatTHB(result.totalTHB))
-                                            .font(.headline.weight(.semibold))
-                                            .monospacedDigit()
+                                    if index < lookupDayGroups.count - 1 {
+                                        Divider()
                                     }
-                                    .tgCard(cornerRadius: 14, verticalPadding: 10)
-                                    .padding(.vertical, 0)
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
                                 }
                             }
+                            .tgFrostedCard(cornerRadius: 16, verticalPadding: 10)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                        } header: {
-                            sectionHeader("Flights", systemImage: "airplane")
-                        }
-
-                        Section {
-                            VStack(spacing: 12) {
-                                Button {
-                                    newCalendarName = ""
-                                    isShowingCreateCalendarSheet = true
-                                } label: {
-                                    Label("Create New Calendar", systemImage: "plus.circle")
-                                        .font(.headline.weight(.semibold))
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(themeIndigo)
-                                .disabled(isAddingToCalendar || isProcessingSchedule)
-
-                                Button {
-                                    Task {
-                                        await openExistingCalendarSheet()
-                                    }
-                                } label: {
-                                    if isLoadingCalendars {
-                                        HStack(spacing: 8) {
-                                            ProgressView()
-                                            Text("Loading calendars...")
-                                                .fontWeight(.semibold)
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    } else {
-                                        Label("Add to Existing Calendar", systemImage: "calendar")
-                                            .font(.headline.weight(.semibold))
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(themeIndigo)
-                                .disabled(isAddingToCalendar || isProcessingSchedule || isLoadingCalendars)
-                            }
-                            .tgCard()
-                            .padding(.vertical, 2)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                        } header: {
-                            sectionHeader("Add to Calendar", systemImage: "calendar.badge.plus")
                         }
                     }
 
@@ -263,8 +260,7 @@ struct ContentView: View {
                                 Text(loadErrorMessage)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
-                                    .tgCard(cornerRadius: 14, verticalPadding: 12)
-                                    .padding(.vertical, 0)
+                                    .tgFrostedCard(cornerRadius: 14, verticalPadding: 12)
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                             } footer: {
@@ -272,7 +268,6 @@ struct ContentView: View {
                                     .textCase(nil)
                             }
                         }
-
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -307,6 +302,23 @@ struct ContentView: View {
                     }
                 }
                 .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button {
+                                isShowingLogbook = true
+                            } label: {
+                                Label("Logbook", systemImage: "chart.bar.xaxis")
+                            }
+                            Button {
+                                isShowingShareRoster = true
+                            } label: {
+                                Label("Share Roster", systemImage: "square.and.arrow.up")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(themeIndigo)
+                        }
+                    }
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button("Done") {
@@ -322,6 +334,18 @@ struct ContentView: View {
                 }
                 .sheet(isPresented: $isShowingExistingCalendarSheet) {
                     existingCalendarSheet
+                }
+                .sheet(isPresented: $isShowingLogbook) {
+                    NavigationStack {
+                        LogbookView()
+                            .environmentObject(store)
+                    }
+                }
+                .sheet(isPresented: $isShowingShareRoster) {
+                    NavigationStack {
+                        SharedRosterView()
+                            .environmentObject(store)
+                    }
                 }
 
                 if sortedMonths.isEmpty {
@@ -437,6 +461,7 @@ struct ContentView: View {
         return EarningsCalculator.calculate(
             for: month,
             season: selectedSeason,
+            rank: selectedRank,
             tables: rateTables
         )
     }
@@ -463,14 +488,6 @@ struct ContentView: View {
 
     private var backgroundGradient: LinearGradient {
         TGTheme.backgroundGradient
-    }
-
-    @ViewBuilder
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(themeIndigo)
-            .textCase(nil)
     }
 
     private var createCalendarSheet: some View {
@@ -1349,31 +1366,5 @@ private enum PDFImportValidationError: LocalizedError {
         case let .fileTooLarge(maxMB):
             return "PDF is too large. Please import a file smaller than \(maxMB) MB."
         }
-    }
-}
-
-private struct TGCardModifier: ViewModifier {
-    let cornerRadius: CGFloat
-    let verticalPadding: CGFloat
-
-    func body(content: Content) -> some View {
-        content
-            .padding(.horizontal, 14)
-            .padding(.vertical, verticalPadding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(TGTheme.cardFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(TGTheme.cardStroke, lineWidth: 1.1)
-                    )
-                    .shadow(color: TGTheme.cardShadow, radius: 20, x: 0, y: 12)
-            )
-    }
-}
-
-private extension View {
-    func tgCard(cornerRadius: CGFloat = 18, verticalPadding: CGFloat = 14) -> some View {
-        modifier(TGCardModifier(cornerRadius: cornerRadius, verticalPadding: verticalPadding))
     }
 }

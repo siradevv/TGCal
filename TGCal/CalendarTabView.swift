@@ -12,6 +12,7 @@ struct CalendarTabView: View {
     @State private var isShowingPDFImporter = false
     @State private var isProcessingSchedule = false
     @State private var alertContext: CalendarAlertContext?
+    @State private var isMonthStatsExpanded = false
 
     @Binding var selectedTab: Tab
 
@@ -184,9 +185,9 @@ struct CalendarTabView: View {
         let dayEvents = buildDayEvents()
         let calendar = Calendar.roster
         let comps = calendar.dateComponents([.year, .month], from: displayedMonth)
-        let firstDayOfMonth = calendar.date(from: comps)!
+        let firstDayOfMonth = calendar.date(from: comps) ?? displayedMonth
         let weekdayOffset = (calendar.component(.weekday, from: firstDayOfMonth) + 5) % 7 // Monday = 0
-        let daysInMonth = calendar.range(of: .day, in: .month, for: displayedMonth)!.count
+        let daysInMonth = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 30
         let today = calendar.component(.day, from: Date())
         let isCurrentMonth = calendar.isDate(displayedMonth, equalTo: Date(), toGranularity: .month)
 
@@ -219,10 +220,9 @@ struct CalendarTabView: View {
 
                             CalendarDayCell(
                                 day: dayNumber,
-                                hasFlights: events?.hasFlights ?? false,
-                                hasDuty: events?.hasDuty ?? false,
-                                hasSwap: events?.hasSwap ?? false,
-                                isDayOff: events?.isDayOff ?? true,
+                                flightCount: events?.flightDestinations.count ?? 0,
+                                dutyCount: events?.dutyCodes.count ?? 0,
+                                swapCount: events?.swapDestinations.count ?? 0,
                                 isToday: isToday,
                                 isSelected: isSelected
                             )
@@ -254,7 +254,6 @@ struct CalendarTabView: View {
             legendItem(color: TGTheme.indigo, label: "Flight")
             legendItem(color: .orange, label: "Duty")
             legendItem(color: .green, label: "Swap")
-            legendItem(color: Color.secondary.opacity(0.3), label: "Off")
         }
         .font(.caption2)
         .frame(maxWidth: .infinity)
@@ -274,12 +273,10 @@ struct CalendarTabView: View {
 
     private func selectedDayDetail(_ dayEvents: CalendarDayEvents) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            let dayFormatter = DateFormatter()
-            let _ = dayFormatter.dateFormat = "EEEE, d MMMM"
-
             Text(dayLabel(dayEvents.day))
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(TGTheme.indigo)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             ForEach(Array(dayEvents.events.enumerated()), id: \.offset) { _, event in
                 switch event {
@@ -293,9 +290,11 @@ struct CalendarTabView: View {
                     Text("Day off")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
+        .frame(maxWidth: .infinity)
         .tgFrostedCard(cornerRadius: 16, verticalPadding: 12)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -385,7 +384,22 @@ struct CalendarTabView: View {
         return Group {
             if let month = month {
                 VStack(alignment: .leading, spacing: 8) {
-                    TGSectionHeader(title: "This Month", systemImage: "chart.bar")
+                    // Tappable header
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isMonthStatsExpanded.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            TGSectionHeader(title: "This Month", systemImage: "chart.bar")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .rotationEffect(.degrees(isMonthStatsExpanded ? 90 : 0))
+                        }
+                    }
+                    .buttonStyle(.plain)
 
                     HStack(spacing: 20) {
                         statPill(value: "\(flightCount)", label: "Flights")
@@ -393,6 +407,14 @@ struct CalendarTabView: View {
                         statPill(value: "\(month.flightsByDay.count)", label: "Days")
                     }
                     .frame(maxWidth: .infinity)
+
+                    // Expanded flight list
+                    if isMonthStatsExpanded {
+                        Divider()
+                            .overlay(TGTheme.insetStroke.opacity(0.55))
+
+                        monthFlightList(month)
+                    }
                 }
                 .tgFrostedCard(cornerRadius: 16, verticalPadding: 12)
             }
@@ -408,6 +430,57 @@ struct CalendarTabView: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func monthFlightList(_ month: RosterMonthRecord) -> some View {
+        let sortedDays = month.flightsByDay.keys.sorted()
+
+        return VStack(spacing: 0) {
+            ForEach(sortedDays, id: \.self) { day in
+                let keys = month.flightsByDay[day] ?? []
+                ForEach(Array(keys.enumerated()), id: \.offset) { idx, key in
+                    let detail = month.detailsByFlight[key] ?? month.detailsByFlight[key.strippingLeadingZeros()]
+                    let isDuty = key.isAlphabeticDutyCode
+
+                    HStack(spacing: 10) {
+                        Text("\(day)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, alignment: .trailing)
+                            .monospacedDigit()
+
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(isDuty ? .orange : TGTheme.indigo)
+                            .frame(width: 3, height: 28)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(detail?.flightCode ?? key.uppercased())
+                                .font(.caption.weight(.semibold))
+                            if let dest = detail?.destination, !isDuty {
+                                Text(detail?.routeText ?? dest)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        if let schedule = detail?.scheduleText, !schedule.isEmpty {
+                            Text(schedule)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    if !(day == sortedDays.last && idx == keys.count - 1) {
+                        Divider()
+                            .overlay(TGTheme.insetStroke.opacity(0.3))
+                    }
+                }
+            }
         }
     }
 
@@ -668,10 +741,9 @@ struct CalendarTabView: View {
 
 struct CalendarDayCell: View {
     let day: Int
-    let hasFlights: Bool
-    let hasDuty: Bool
-    let hasSwap: Bool
-    let isDayOff: Bool
+    let flightCount: Int
+    let dutyCount: Int
+    let swapCount: Int
     let isToday: Bool
     let isSelected: Bool
 
@@ -680,42 +752,30 @@ struct CalendarDayCell: View {
             Text("\(day)")
                 .font(.subheadline.weight(isToday ? .bold : .regular))
                 .foregroundStyle(isToday ? .white : isSelected ? TGTheme.indigo : .primary)
+                .frame(width: 30, height: 30)
+                .background {
+                    if isToday {
+                        Circle().fill(TGTheme.indigo)
+                    } else if isSelected {
+                        Circle().fill(TGTheme.indigo.opacity(0.12))
+                    }
+                }
 
-            HStack(spacing: 2) {
-                if hasFlights {
-                    Circle()
-                        .fill(TGTheme.indigo)
-                        .frame(width: 5, height: 5)
+            HStack(spacing: 3) {
+                ForEach(0..<min(flightCount, 2), id: \.self) { _ in
+                    Circle().fill(TGTheme.indigo).frame(width: 6, height: 6)
                 }
-                if hasDuty {
-                    Circle()
-                        .fill(.orange)
-                        .frame(width: 5, height: 5)
+                ForEach(0..<min(dutyCount, 1), id: \.self) { _ in
+                    Circle().fill(.orange).frame(width: 6, height: 6)
                 }
-                if hasSwap {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 5, height: 5)
+                ForEach(0..<min(swapCount, 1), id: \.self) { _ in
+                    Circle().fill(.green).frame(width: 6, height: 6)
                 }
             }
-            .frame(height: 5)
+            .frame(height: 6)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 48)
-        .background(
-            Group {
-                if isToday {
-                    Circle()
-                        .fill(TGTheme.indigo)
-                        .frame(width: 32, height: 32)
-                } else if isSelected {
-                    Circle()
-                        .fill(TGTheme.indigo.opacity(0.12))
-                        .frame(width: 32, height: 32)
-                }
-            },
-            alignment: .top
-        )
         .contentShape(Rectangle())
     }
 }

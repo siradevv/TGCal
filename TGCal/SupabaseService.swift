@@ -209,22 +209,60 @@ final class SupabaseService: ObservableObject {
     /// Shared post-auth logic: load profile and register push token
     private func completeAuthentication() async throws {
         try await loadProfile()
+        PushNotificationManager.shared.requestPermissionAndRegister()
         PushNotificationManager.shared.registerTokenAfterLogin()
     }
 
-    func updateProfile(displayName: String, crewRank: CrewRank) async throws {
+    func updateProfile(displayName: String, crewRank: CrewRank, batch: String?) async throws {
         guard let userId = currentUser?.id else { return }
+
+        var updates: [String: String] = [
+            "display_name": displayName,
+            "crew_rank": crewRank.rawValue
+        ]
+        updates["batch"] = batch
 
         try await client
             .from("profiles")
-            .update([
-                "display_name": displayName,
-                "crew_rank": crewRank.rawValue
-            ])
+            .update(updates)
             .eq("id", value: userId.uuidString)
             .execute()
 
         currentUser?.displayName = displayName
         currentUser?.crewRank = crewRank
+        currentUser?.batch = batch
+    }
+
+    func uploadAvatar(imageData: Data) async throws -> String {
+        guard let userId = currentUser?.id else {
+            throw NSError(domain: "SupabaseService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Not signed in"])
+        }
+
+        let path = "\(userId.uuidString.lowercased())/avatar.jpg"
+
+        try await client.storage
+            .from("avatars")
+            .upload(
+                path: path,
+                file: imageData,
+                options: .init(contentType: "image/jpeg", upsert: true)
+            )
+
+        let publicURL = try client.storage
+            .from("avatars")
+            .getPublicURL(path: path)
+            .absoluteString
+
+        // Append cache-busting timestamp so AsyncImage reloads
+        let urlWithCacheBust = "\(publicURL)?t=\(Int(Date().timeIntervalSince1970))"
+
+        try await client
+            .from("profiles")
+            .update(["avatar_url": urlWithCacheBust] as [String: String])
+            .eq("id", value: userId.uuidString)
+            .execute()
+
+        currentUser?.avatarUrl = urlWithCacheBust
+        return urlWithCacheBust
     }
 }

@@ -4,6 +4,7 @@ struct EarningsView: View {
     @EnvironmentObject private var store: TGCalStore
 
     @State private var selectedSeason: PPBSeason = .summer
+    @AppStorage("selectedCrewRank") private var selectedRank: PPBRank = .scc
     @State private var rateTables: [PPBSeason: PPBRateTable] = [:]
     @State private var loadErrorMessage: String?
 
@@ -27,6 +28,13 @@ struct EarningsView: View {
                             Picker("Season", selection: $selectedSeason) {
                                 ForEach(PPBSeason.allCases) { season in
                                     Text(season.displayName).tag(season)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
+                            Picker("Rank", selection: $selectedRank) {
+                                ForEach(PPBRank.allCases) { rank in
+                                    Text(rank.displayName).tag(rank)
                                 }
                             }
                             .pickerStyle(.segmented)
@@ -152,6 +160,7 @@ struct EarningsView: View {
         return EarningsCalculator.calculate(
             for: month,
             season: selectedSeason,
+            rank: selectedRank,
             tables: rateTables
         )
     }

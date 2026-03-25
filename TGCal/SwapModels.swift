@@ -7,6 +7,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
     var displayName: String
     var crewRank: CrewRank
     var avatarUrl: String?
+    var batch: String?
     let createdAt: Date?
     var updatedAt: Date?
 
@@ -15,6 +16,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
         case displayName = "display_name"
         case crewRank = "crew_rank"
         case avatarUrl = "avatar_url"
+        case batch
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -53,6 +55,13 @@ struct SwapListing: Codable, Identifiable, Equatable {
     let createdAt: Date?
     var updatedAt: Date?
 
+    // Return leg (round-trip)
+    let returnFlightCode: String?
+    let returnOrigin: String?
+    let returnDestination: String?
+    let returnFlightDate: String?
+    let returnDepartureTime: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case postedBy = "posted_by"
@@ -67,21 +76,50 @@ struct SwapListing: Codable, Identifiable, Equatable {
         case matchedWith = "matched_with"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case returnFlightCode = "return_flight_code"
+        case returnOrigin = "return_origin"
+        case returnDestination = "return_destination"
+        case returnFlightDate = "return_flight_date"
+        case returnDepartureTime = "return_departure_time"
     }
+
+    var isRoundTrip: Bool { returnFlightCode != nil }
 
     var routeText: String {
         "\(origin) \u{2192} \(destination)"
     }
 
+    var returnRouteText: String? {
+        guard let ro = returnOrigin, let rd = returnDestination else { return nil }
+        return "\(ro) \u{2192} \(rd)"
+    }
+
     var displayDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = formatter.date(from: flightDate) else { return flightDate }
-        let display = DateFormatter()
-        display.dateFormat = "EEE, d MMM yyyy"
-        display.locale = Locale(identifier: "en_US")
-        return display.string(from: date)
+        Self.formatDate(flightDate)
+    }
+
+    var returnDisplayDate: String? {
+        guard let rfd = returnFlightDate else { return nil }
+        return Self.formatDate(rfd)
+    }
+
+    private static let parseFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let displayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
+    private static func formatDate(_ dateString: String) -> String {
+        guard let date = parseFormatter.date(from: dateString) else { return dateString }
+        return displayFormatter.string(from: date)
     }
 }
 
@@ -102,6 +140,13 @@ struct NewSwapListing: Codable {
     let departureTime: String?
     let note: String?
 
+    // Return leg (round-trip)
+    let returnFlightCode: String?
+    let returnOrigin: String?
+    let returnDestination: String?
+    let returnFlightDate: String?
+    let returnDepartureTime: String?
+
     enum CodingKeys: String, CodingKey {
         case postedBy = "posted_by"
         case postedByName = "posted_by_name"
@@ -111,6 +156,11 @@ struct NewSwapListing: Codable {
         case flightDate = "flight_date"
         case departureTime = "departure_time"
         case note
+        case returnFlightCode = "return_flight_code"
+        case returnOrigin = "return_origin"
+        case returnDestination = "return_destination"
+        case returnFlightDate = "return_flight_date"
+        case returnDepartureTime = "return_departure_time"
     }
 }
 

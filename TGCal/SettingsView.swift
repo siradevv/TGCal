@@ -5,6 +5,7 @@ struct SettingsView: View {
     @State private var isShowingPrivacyPolicy = false
     @State private var isShowingProfile = false
     @ObservedObject private var supabase = SupabaseService.shared
+    @ObservedObject private var offlineCache = OfflineCacheService.shared
     @AppStorage("reminders_enabled") private var remindersEnabled = true
     @AppStorage("reminder_12h") private var reminder12h = true
     @AppStorage("reminder_3h") private var reminder3h = true
@@ -25,14 +26,7 @@ struct SettingsView: View {
                                         isShowingProfile = true
                                     } label: {
                                         HStack(spacing: 12) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(TGTheme.indigo.opacity(0.15))
-                                                    .frame(width: 40, height: 40)
-                                                Image(systemName: "person.fill")
-                                                    .font(.headline)
-                                                    .foregroundStyle(TGTheme.indigo)
-                                            }
+                                            profileAvatar
 
                                             VStack(alignment: .leading, spacing: 2) {
                                                 Text(supabase.currentUser?.displayName ?? "Crew Member")
@@ -209,6 +203,25 @@ struct SettingsView: View {
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
 
+                    // Sync status
+                    HStack(spacing: 8) {
+                        Image(systemName: offlineCache.isOnline ? "wifi" : "wifi.slash")
+                            .font(.caption)
+                            .foregroundStyle(offlineCache.isOnline ? .green : .orange)
+
+                        Text(offlineCache.isOnline ? "Online" : "Offline — cached data available")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text("Synced \(offlineCache.lastSyncText)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 6)
+
                     Text(appVersionBuildText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -257,6 +270,45 @@ struct SettingsView: View {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
         return "Version \(shortVersion) (\(build))"
+    }
+
+    private var profileAvatar: some View {
+        Group {
+            if let urlString = supabase.currentUser?.avatarUrl,
+               let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                    } else {
+                        profileInitials
+                    }
+                }
+            } else {
+                profileInitials
+            }
+        }
+    }
+
+    private var profileInitials: some View {
+        ZStack {
+            Circle()
+                .fill(TGTheme.indigo.opacity(0.15))
+                .frame(width: 40, height: 40)
+            Text({
+                let name = supabase.currentUser?.displayName ?? ""
+                let parts = name.split(separator: " ")
+                if parts.count >= 2 {
+                    return "\(parts[0].prefix(1))\(parts[1].prefix(1))".uppercased()
+                }
+                return String(name.prefix(2)).uppercased()
+            }())
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(TGTheme.indigo)
+        }
     }
 
     private func settingsRow(title: String) -> some View {
