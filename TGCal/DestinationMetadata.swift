@@ -50,20 +50,21 @@ enum DestinationMetadata {
         return fallbackInfo(for: code)
     }
 
-    private static func fallbackInfo(for airportCode: String) -> DestinationInfo {
-        let fallbackCountry = "TH"
-        let profile = countryProfiles[fallbackCountry] ?? CountryProfile(currencyCode: "THB", plugType: .C, voltage: 220)
+    static func isKnownAirport(_ airportCode: String) -> Bool {
+        airportSeeds[airportCode.uppercased()] != nil
+    }
 
+    private static func fallbackInfo(for airportCode: String) -> DestinationInfo {
         return DestinationInfo(
             airportCode: airportCode,
             cityName: airportCode,
-            countryCode: fallbackCountry,
-            latitude: 13.6900,
-            longitude: 100.7501,
-            timeZoneIdentifier: "Asia/Bangkok",
-            currencyCode: profile.currencyCode,
-            plugType: profile.plugType,
-            voltage: profile.voltage
+            countryCode: "",
+            latitude: 0,
+            longitude: 0,
+            timeZoneIdentifier: "UTC",
+            currencyCode: "",
+            plugType: .C,
+            voltage: 0
         )
     }
 

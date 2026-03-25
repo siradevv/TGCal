@@ -86,6 +86,8 @@ final class TGCalStore: ObservableObject {
         }
         activeMonthId = record.id
         saveToDisk()
+        WidgetDataService.updateNextFlight(from: months)
+        NotificationService.shared.scheduleReminders(for: record)
     }
 
     func setActiveMonth(_ id: String?) {
@@ -105,8 +107,13 @@ final class TGCalStore: ObservableObject {
             activeMonthId = decoded.activeMonthId
             months = decoded.months
         } catch {
-            activeMonthId = nil
-            months = []
+            // Preserve existing in-memory data rather than wiping on decode failure.
+            // Only reset if there was no data loaded yet (first launch).
+            if months.isEmpty {
+                activeMonthId = nil
+                months = []
+            }
+            print("[TGCalStore] Failed to load from disk: \(error.localizedDescription)")
         }
     }
 
@@ -120,7 +127,7 @@ final class TGCalStore: ObservableObject {
             let url = try storeFileURL()
             try data.write(to: url, options: [.atomic])
         } catch {
-            return
+            print("[TGCalStore] Failed to save to disk: \(error.localizedDescription)")
         }
     }
 
@@ -173,7 +180,7 @@ private struct FlightLookupRecordCodable: Codable, Equatable {
             destination: destination,
             departureTime: departureTime,
             arrivalTime: arrivalTime,
-            state: FlightLookupState(rawValue: stateRawValue) ?? .found,
+            state: FlightLookupState(rawValue: stateRawValue) ?? .failed,
             sourceLabel: sourceLabel
         )
     }

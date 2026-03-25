@@ -674,12 +674,24 @@ struct ContentView: View {
         components.day = 1
 
         let date = components.date ?? Date()
+        return Self.monthYearFormatter.string(from: date)
+    }
+
+    private static let monthYearFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = .roster
         formatter.timeZone = rosterTimeZone
         formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: date)
-    }
+        return formatter
+    }()
+
+    private static let monthOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = .roster
+        formatter.timeZone = rosterTimeZone
+        formatter.dateFormat = "MMMM"
+        return formatter
+    }()
 
     private func monthName(for month: RosterMonthRecord) -> String {
         var components = DateComponents()
@@ -690,11 +702,7 @@ struct ContentView: View {
         components.day = 1
 
         let date = components.date ?? Date()
-        let formatter = DateFormatter()
-        formatter.calendar = .roster
-        formatter.timeZone = rosterTimeZone
-        formatter.dateFormat = "MMMM"
-        return formatter.string(from: date)
+        return Self.monthOnlyFormatter.string(from: date)
     }
 
     private func loadRateTablesIfNeeded() {

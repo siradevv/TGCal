@@ -58,9 +58,16 @@ struct OCRService {
         usesLanguageCorrection: Bool
     ) async throws -> [OCRLine] {
         try await withCheckedThrowingContinuation { continuation in
+            var didResume = false
+            let resumeOnce: (Result<[OCRLine], Error>) -> Void = { result in
+                guard !didResume else { return }
+                didResume = true
+                continuation.resume(with: result)
+            }
+
             let request = VNRecognizeTextRequest { request, error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    resumeOnce(.failure(error))
                     return
                 }
 
@@ -88,7 +95,7 @@ struct OCRService {
                     }
                 }
 
-                continuation.resume(returning: lines)
+                resumeOnce(.success(lines))
             }
 
             request.recognitionLevel = .accurate
@@ -105,7 +112,7 @@ struct OCRService {
                 do {
                     try handler.perform([request])
                 } catch {
-                    continuation.resume(throwing: error)
+                    resumeOnce(.failure(error))
                 }
             }
         }

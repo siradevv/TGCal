@@ -73,7 +73,7 @@ final class EarningsCalculatorTests: XCTestCase {
     }
 
     private func makeMonthRecord() -> RosterMonthRecord {
-        let serviceDate = Date(timeIntervalSince1970: 1_709_251_200) // 2024-03-01 00:00:00 +0000
+        let serviceDate = Date(timeIntervalSince1970: 1_709_251_200) // 2024-03-01 (test data date)
 
         let details: [String: FlightLookupRecord] = [
             "560": FlightLookupRecord(

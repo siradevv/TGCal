@@ -11,6 +11,8 @@ struct OverviewView: View {
     @State private var isShowingPDFImporter = false
     @State private var isProcessingSchedule = false
     @State private var alertContext: OverviewAlertContext?
+    @State private var isShowingExportSheet = false
+    @State private var exportFileURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -57,6 +59,11 @@ struct OverviewView: View {
             ) { result in
                 Task {
                     await importSchedulePDF(result)
+                }
+            }
+            .sheet(isPresented: $isShowingExportSheet) {
+                if let exportFileURL {
+                    ShareSheetView(activityItems: [exportFileURL])
                 }
             }
             .alert(item: $alertContext) { context in
@@ -139,6 +146,39 @@ struct OverviewView: View {
                 statRow(title: "Total flights", value: "\(summary.numericFlightCount)")
                 statRow(title: "Total flying hours", value: formatDuration(summary.totalBlockMinutes))
                 statRow(title: "Estimated earnings", value: formatTHB(estimatedEarningsTotal(for: activeMonth)))
+
+                    Divider()
+
+                    Menu {
+                        Button {
+                            exportEarnings(for: activeMonth, format: .pdf)
+                        } label: {
+                            Label("Export as PDF", systemImage: "doc.richtext")
+                        }
+                        Button {
+                            exportEarnings(for: activeMonth, format: .csv)
+                        } label: {
+                            Label("Export as CSV", systemImage: "tablecells")
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Export Earnings")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(TGTheme.indigo)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(TGTheme.insetFill)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(TGTheme.insetStroke, lineWidth: 1)
+                                )
+                        )
+                    }
             }
             .tgOverviewCard(verticalPadding: 12)
 
@@ -246,9 +286,10 @@ struct OverviewView: View {
             return 0
         }
 
+        let season: PPBSeason = (month.month >= 4 && month.month <= 10) ? .summer : .winter
         return EarningsCalculator.calculate(
             for: month,
-            season: .summer,
+            season: season,
             tables: rateTables
         ).totalTHB
     }
@@ -436,6 +477,39 @@ struct OverviewView: View {
         }
 
         return nil
+    }
+
+    private enum ExportFormat { case pdf, csv }
+
+    private func exportEarnings(for month: RosterMonthRecord, format: ExportFormat) {
+        let summary = monthSummary(for: month)
+        let earningsResult = EarningsCalculator.calculate(
+            for: month,
+            season: .summer,
+            tables: rateTables
+        )
+
+        let data: Data
+        let fileName: String
+        let monthLabel = monthTitle(for: month).replacingOccurrences(of: " ", with: "_")
+
+        switch format {
+        case .pdf:
+            data = EarningsExportService.generatePDF(result: earningsResult, flightCount: summary.numericFlightCount)
+            fileName = "TGCal_Earnings_\(monthLabel).pdf"
+        case .csv:
+            data = EarningsExportService.generateCSV(result: earningsResult, flightCount: summary.numericFlightCount)
+            fileName = "TGCal_Earnings_\(monthLabel).csv"
+        }
+
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try data.write(to: tempURL, options: .atomic)
+            exportFileURL = tempURL
+            isShowingExportSheet = true
+        } catch {
+            alertContext = OverviewAlertContext(title: "Export Failed", message: error.localizedDescription)
+        }
     }
 
     private func monthSummary(for month: RosterMonthRecord) -> MonthSummary {
@@ -1092,4 +1166,14 @@ extension View {
     func tgOverviewCard(cornerRadius: CGFloat = 18, verticalPadding: CGFloat = 14) -> some View {
         modifier(OverviewCardModifier(cornerRadius: cornerRadius, verticalPadding: verticalPadding))
     }
+}
+
+struct ShareSheetView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

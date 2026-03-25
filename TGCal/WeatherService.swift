@@ -18,7 +18,7 @@ actor WeatherService {
     static let shared = WeatherService()
 
     private var cachedCurrentWeather: [String: (timestamp: Date, weather: DestinationWeather)] = [:]
-    private var cachedArrivalWeather: [String: DestinationWeather] = [:]
+    private var cachedArrivalWeather: [String: (timestamp: Date, weather: DestinationWeather)] = [:]
 
     func currentWeather(latitude: Double, longitude: Double) async throws -> DestinationWeather {
         let key = String(format: "%.3f,%.3f", latitude, longitude)
@@ -31,7 +31,10 @@ actor WeatherService {
             throw URLError(.badURL)
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
         let decoded = try JSONDecoder().decode(OpenMeteoCurrentResponse.self, from: data)
 
         let weather = DestinationWeather(
@@ -59,8 +62,8 @@ actor WeatherService {
             arrivalDate: arrivalDate,
             timeZone: destinationTimeZone
         )
-        if let cached = cachedArrivalWeather[cacheKey] {
-            return cached
+        if let cached = cachedArrivalWeather[cacheKey], Date().timeIntervalSince(cached.timestamp) < 30 * 60 {
+            return cached.weather
         }
 
         let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=16"
@@ -68,7 +71,10 @@ actor WeatherService {
             throw URLError(.badURL)
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
         let decoded = try JSONDecoder().decode(OpenMeteoHourlyResponse.self, from: data)
         let weather = try closestHourlyWeather(
             from: decoded.hourly,
@@ -76,7 +82,7 @@ actor WeatherService {
             timeZone: destinationTimeZone
         )
 
-        cachedArrivalWeather[cacheKey] = weather
+        cachedArrivalWeather[cacheKey] = (Date(), weather)
         return weather
     }
 

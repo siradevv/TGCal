@@ -68,7 +68,6 @@ struct TGNoRosterHeroCard: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 22)
         .frame(maxWidth: .infinity, minHeight: 300, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(TGTheme.cardFill)
@@ -78,9 +77,10 @@ struct TGNoRosterHeroCard: View {
                 )
                 .shadow(color: TGTheme.cardShadow, radius: 24, x: 0, y: 14)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onAppear {
-            glowPulse = true
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                glowPulse = true
                 iconBobOffset = -3
             }
         }
