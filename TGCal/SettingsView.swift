@@ -153,7 +153,7 @@ struct SettingsView: View {
                                 VStack(spacing: 0) {
                                     Button {
                                         Task {
-                                            try? await supabase.signOut()
+                                            _ = try? await supabase.signOut()
                                         }
                                     } label: {
                                         HStack(spacing: 12) {

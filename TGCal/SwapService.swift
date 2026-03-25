@@ -27,7 +27,6 @@ final class SwapService: ObservableObject {
             .from("swap_listings")
             .select()
             .eq("status", value: "open")
-            .order("flight_date", ascending: true)
 
         if let destination, destination.isEmpty == false {
             query = query.eq("destination", value: destination.uppercased())
@@ -56,6 +55,7 @@ final class SwapService: ObservableObject {
         }
 
         listings = try await query
+            .order("flight_date", ascending: true)
             .limit(50)
             .execute()
             .value

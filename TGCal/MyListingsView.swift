@@ -144,11 +144,11 @@ struct MyListingsView: View {
     private func loadMyListings() async {
         isLoading = swapService.myListings.isEmpty
         defer { isLoading = false }
-        try? await swapService.fetchMyListings()
+        _ = try? await swapService.fetchMyListings()
     }
 
     private func cancelListing(_ listing: SwapListing) async {
-        try? await swapService.cancelListing(listing.id)
+        _ = try? await swapService.cancelListing(listing.id)
         listingToCancel = nil
     }
 }

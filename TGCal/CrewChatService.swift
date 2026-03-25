@@ -39,14 +39,16 @@ final class CrewChatService: ObservableObject {
             .from("crew_channel_messages")
             .select()
             .eq("channel_id", value: channelId.uuidString)
-            .order("sent_at", ascending: true)
-            .limit(limit)
 
         if let before {
-            query = query.lt("sent_at", value: ISO8601DateFormatter().string(from: before))
+            query = query.lte("sent_at", value: ISO8601DateFormatter().string(from: before))
         }
 
-        return try await query.execute().value
+        return try await query
+            .order("sent_at", ascending: true)
+            .limit(limit)
+            .execute()
+            .value
     }
 
     func sendMessage(channelId: UUID, text: String) async throws -> CrewChannelMessage {
@@ -71,7 +73,7 @@ final class CrewChatService: ObservableObject {
             .value
 
         // Update channel last message
-        try? await client
+        _ = try? await client
             .from("crew_channels")
             .update([
                 "last_message_text": text,

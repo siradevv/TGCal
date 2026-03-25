@@ -432,7 +432,7 @@ struct LayoverTipCard: View {
     private func vote(isUpvote: Bool) async {
         isVoting = true
         defer { isVoting = false }
-        try? await layoverService.vote(tipId: tip.id, isUpvote: isUpvote)
+        _ = try? await layoverService.vote(tipId: tip.id, isUpvote: isUpvote)
     }
 }
 

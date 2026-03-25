@@ -134,7 +134,7 @@ struct SharedRosterView: View {
 
             Button {
                 Task {
-                    try? await sharedRosterService.deactivateLink(link.id)
+                    _ = try? await sharedRosterService.deactivateLink(link.id)
                 }
             } label: {
                 Image(systemName: "trash")

@@ -63,7 +63,7 @@ final class CrewPairingService: ObservableObject {
             let batchEnd = min(batchStart + batchSize, registrations.count)
             let batch = Array(registrations[batchStart..<batchEnd])
 
-            try? await client
+            _ = try? await client
                 .from("crew_flight_registry")
                 .upsert(batch)
                 .execute()
@@ -99,7 +99,7 @@ final class CrewPairingService: ObservableObject {
     func deregisterAllFlights() async {
         guard let userId = SupabaseService.shared.currentUser?.id else { return }
 
-        try? await client
+        _ = try? await client
             .from("crew_flight_registry")
             .delete()
             .eq("user_id", value: userId.uuidString)

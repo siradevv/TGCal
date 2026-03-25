@@ -195,6 +195,6 @@ struct ConversationsListView: View {
         isLoading = swapService.conversations.isEmpty
         defer { isLoading = false }
 
-        try? await swapService.fetchMyConversations()
+        _ = try? await swapService.fetchMyConversations()
     }
 }

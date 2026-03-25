@@ -261,7 +261,7 @@ struct ChatView: View {
         // Load messages
         do {
             messages = try await SwapService.shared.fetchMessages(conversationId: conversation.id)
-            try? await SwapService.shared.markMessagesAsRead(conversationId: conversation.id)
+            _ = try? await SwapService.shared.markMessagesAsRead(conversationId: conversation.id)
         } catch {
             // Show empty state
         }
