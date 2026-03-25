@@ -63,8 +63,25 @@ final class NotificationService {
         let capped = flights.prefix(30)
 
         // Cancel existing notifications for this month before scheduling new ones.
-        cancelReminders(for: monthId)
+        // Use completion handler to ensure cancellation finishes before scheduling.
+        let prefix = "\(identifierPrefix)\(monthId)-"
+        center.getPendingNotificationRequests { [weak self] requests in
+            let matching = requests
+                .map(\.identifier)
+                .filter { $0.hasPrefix(prefix) }
+            self?.center.removePendingNotificationRequests(withIdentifiers: matching)
+        }
 
+        // Small delay to let cancel complete before scheduling new ones
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            self.scheduleNewReminders(capped: Array(capped), monthId: monthId)
+        }
+    }
+
+    private func scheduleNewReminders(
+        capped: [(day: Int, flightNumber: String, detail: FlightLookupRecord, departureDate: Date)],
+        monthId: String
+    ) {
         for entry in capped {
             let detail = entry.detail
             let number = entry.flightNumber.strippingLeadingZeros()

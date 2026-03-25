@@ -20,7 +20,7 @@ struct PPBRateTable: Equatable {
 }
 
 struct EarningsLineItem: Identifiable, Equatable {
-    var id: String { flightNumber }
+    let id = UUID()
     let flightNumber: String
     let count: Int
     let ppb: Int?

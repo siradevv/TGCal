@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Main swap board — browse, search, and filter available flight swaps.
 struct SwapBoardView: View {
+    @EnvironmentObject private var store: TGCalStore
     @ObservedObject private var supabase = SupabaseService.shared
     @ObservedObject private var swapService = SwapService.shared
 
@@ -58,6 +59,7 @@ struct SwapBoardView: View {
             }
             .sheet(isPresented: $isShowingPostSheet) {
                 PostSwapView()
+                    .environmentObject(store)
             }
             .sheet(isPresented: $isShowingMyListings) {
                 MyListingsView()

@@ -322,12 +322,22 @@ struct PostableFlightOption: Identifiable {
         "\(origin) \u{2192} \(destination)"
     }
 
+    private static let parseFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let displayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
     var displayDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: flightDate) else { return flightDate }
-        let display = DateFormatter()
-        display.dateFormat = "EEE, d MMM"
-        return display.string(from: date)
+        guard let date = Self.parseFormatter.date(from: flightDate) else { return flightDate }
+        return Self.displayFormatter.string(from: date)
     }
 }

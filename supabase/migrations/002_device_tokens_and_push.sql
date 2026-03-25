@@ -78,7 +78,7 @@ begin
         return;
     end if;
 
-    perform extensions.http_post(
+    perform net.http_post(
         url := v_url || '/functions/v1/send-push',
         body := jsonb_build_object(
             'recipient_id', p_recipient_id,

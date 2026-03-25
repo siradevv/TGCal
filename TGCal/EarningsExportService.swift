@@ -154,25 +154,17 @@ struct EarningsExportService {
     }
 
     static func generateCSV(result: MonthEarningsResult, flightCount: Int) -> Data {
-        let numberFormatter = NumberFormatter()
-        numberFormatter.numberStyle = .decimal
-        numberFormatter.groupingSeparator = ","
-
-        func fmt(_ value: Int) -> String {
-            numberFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
-        }
-
         var lines: [String] = []
         lines.append("Flight,Count,PPB (THB),Subtotal (THB)")
 
         for item in result.lineItems {
             let flight = "TG\(item.flightNumber)"
-            let ppb = item.ppb != nil ? fmt(item.ppb!) : ""
-            let subtotal = fmt(item.subtotal)
+            let ppb = item.ppb != nil ? "\(item.ppb!)" : ""
+            let subtotal = "\(item.subtotal)"
             lines.append("\(flight),\(item.count),\(ppb),\(subtotal)")
         }
 
-        lines.append("Total,,,\(fmt(result.totalTHB))")
+        lines.append("Total,,,\(result.totalTHB)")
 
         let csvString = lines.joined(separator: "\n") + "\n"
 

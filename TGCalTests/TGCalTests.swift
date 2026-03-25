@@ -99,7 +99,7 @@ final class TGCalTests: XCTestCase {
         XCTAssertEqual(resolved?.detail.flightNumber, "CHMSBA")
     }
 
-    func testFlightDraftNormalizeAdjustsArrivalAcrossMidnight() {
+    func testFlightDraftNormalizeAdjustsArrivalAcrossMidnight() throws {
         var comps = DateComponents()
         comps.calendar = .roster
         comps.timeZone = rosterTimeZone
@@ -108,17 +108,17 @@ final class TGCalTests: XCTestCase {
         comps.day = 20
         comps.hour = 0
         comps.minute = 0
-        let serviceDate = comps.date!
+        let serviceDate = try XCTUnwrap(comps.date)
 
         var departureComps = comps
         departureComps.hour = 23
         departureComps.minute = 15
-        let departure = departureComps.date!
+        let departure = try XCTUnwrap(departureComps.date)
 
         var arrivalComps = comps
         arrivalComps.hour = 1
         arrivalComps.minute = 5
-        let arrival = arrivalComps.date!
+        let arrival = try XCTUnwrap(arrivalComps.date)
 
         var draft = FlightEventDraft(
             serviceDate: serviceDate,

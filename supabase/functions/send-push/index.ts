@@ -29,6 +29,16 @@ interface DeviceToken {
   token: string;
 }
 
+// ── Environment validation ──────────────────────────────
+
+function requireEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 // ── APNs JWT ──────────────────────────────────────────────
 
 let cachedJwt: { token: string; expiresAt: number } | null = null;
@@ -41,9 +51,9 @@ async function getApnsJwt(): Promise<string> {
     return cachedJwt.token;
   }
 
-  const keyId = Deno.env.get("APNS_KEY_ID")!;
-  const teamId = Deno.env.get("APNS_TEAM_ID")!;
-  const privateKeyPem = Deno.env.get("APNS_PRIVATE_KEY")!;
+  const keyId = requireEnv("APNS_KEY_ID");
+  const teamId = requireEnv("APNS_TEAM_ID");
+  const privateKeyPem = requireEnv("APNS_PRIVATE_KEY");
 
   const privateKey = await jose.importPKCS8(privateKeyPem, "ES256");
 
@@ -51,6 +61,7 @@ async function getApnsJwt(): Promise<string> {
     .setProtectedHeader({ alg: "ES256", kid: keyId })
     .setIssuer(teamId)
     .setIssuedAt(now)
+    .setExpirationTime(now + 55 * 60)
     .sign(privateKey);
 
   cachedJwt = { token: jwt, expiresAt: now + 50 * 60 };
@@ -66,7 +77,7 @@ async function sendApnsPush(
   data: Record<string, unknown> = {},
 ): Promise<{ success: boolean; status: number; reason?: string }> {
   const environment = Deno.env.get("APNS_ENVIRONMENT") || "production";
-  const topic = Deno.env.get("APNS_TOPIC")!;
+  const topic = requireEnv("APNS_TOPIC");
 
   const host =
     environment === "production"
@@ -75,6 +86,7 @@ async function sendApnsPush(
 
   const jwt = await getApnsJwt();
 
+  // Nest user-provided data under a custom key to prevent overriding aps fields
   const payload = {
     aps: {
       alert: { title, body },
@@ -82,7 +94,7 @@ async function sendApnsPush(
       badge: 1,
       "mutable-content": 1,
     },
-    ...data,
+    custom: data,
   };
 
   const response = await fetch(`${host}/3/device/${deviceToken}`, {
@@ -92,7 +104,7 @@ async function sendApnsPush(
       "apns-topic": topic,
       "apns-push-type": "alert",
       "apns-priority": "10",
-      "apns-expiration": "0",
+      "apns-expiration": "3600",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -121,7 +133,7 @@ serve(async (req: Request) => {
   // Verify service role key (requests come from pg_net triggers)
   const authHeader = req.headers.get("Authorization") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!authHeader.includes(serviceRoleKey || "___never_match___")) {
+  if (!serviceRoleKey || serviceRoleKey.trim().length === 0 || authHeader !== `Bearer ${serviceRoleKey}`) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -148,10 +160,8 @@ serve(async (req: Request) => {
   }
 
   // Fetch device tokens for recipient
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  const supabaseUrl = requireEnv("SUPABASE_URL");
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const { data: tokens, error } = await supabase
     .from("device_tokens")

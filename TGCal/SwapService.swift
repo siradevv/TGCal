@@ -44,7 +44,15 @@ final class SwapService: ObservableObject {
         }
 
         if let searchText, searchText.isEmpty == false {
-            query = query.or("flight_code.ilike.%\(searchText)%,destination.ilike.%\(searchText)%,origin.ilike.%\(searchText)%")
+            let sanitized = searchText
+                .replacingOccurrences(of: ",", with: "")
+                .replacingOccurrences(of: ".", with: "")
+                .replacingOccurrences(of: "(", with: "")
+                .replacingOccurrences(of: ")", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if sanitized.isEmpty == false {
+                query = query.or("flight_code.ilike.%\(sanitized)%,destination.ilike.%\(sanitized)%,origin.ilike.%\(sanitized)%")
+            }
         }
 
         listings = try await query
@@ -112,7 +120,7 @@ final class SwapService: ObservableObject {
 
         // Enforce 24-hour rule
         guard isSwappable(listing) else {
-            throw SwapServiceError.tooCloseToDepature
+            throw SwapServiceError.tooCloseToDeparture
         }
 
         // Check if conversation already exists
@@ -155,7 +163,15 @@ final class SwapService: ObservableObject {
     func confirmSwap(conversationId: UUID) async throws {
         guard let userId = SupabaseService.shared.currentUser?.id else { return }
 
-        guard let conversation = conversations.first(where: { $0.id == conversationId }) else { return }
+        // Re-fetch conversation from server to avoid race condition
+        let freshConversations: [Conversation] = try await client
+            .from("conversations")
+            .select()
+            .eq("id", value: conversationId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        guard let conversation = freshConversations.first else { return }
 
         let isInitiator = userId == conversation.initiatorId
         let field = isInitiator ? "initiator_confirmed" : "owner_confirmed"
@@ -167,23 +183,23 @@ final class SwapService: ObservableObject {
         let bothConfirmed = otherConfirmed
         if bothConfirmed {
             updates["status"] = "confirmed"
-
-            // Also update the listing status
-            try await client
-                .from("swap_listings")
-                .update(["status": "confirmed", "matched_with": userId.uuidString])
-                .eq("id", value: conversation.listingId.uuidString)
-                .execute()
         }
 
+        // Update conversation first
         try await client
             .from("conversations")
             .update(updates)
             .eq("id", value: conversationId.uuidString)
             .execute()
 
-        // When both confirmed: add calendar event (push notification handled server-side)
+        // Then update listing status if both confirmed
         if bothConfirmed {
+            try await client
+                .from("swap_listings")
+                .update(["status": "confirmed", "matched_with": userId.uuidString])
+                .eq("id", value: conversation.listingId.uuidString)
+                .execute()
+
             if let listing = await fetchListing(id: conversation.listingId) {
                 await SwapCalendarService.shared.addSwapEvent(listing: listing)
             }
@@ -345,13 +361,13 @@ final class SwapService: ObservableObject {
 
 enum SwapServiceError: LocalizedError {
     case notAuthenticated
-    case tooCloseToDepature
+    case tooCloseToDeparture
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
             return "You must be signed in to do this."
-        case .tooCloseToDepature:
+        case .tooCloseToDeparture:
             return "Swaps must be initiated at least 24 hours before departure."
         }
     }

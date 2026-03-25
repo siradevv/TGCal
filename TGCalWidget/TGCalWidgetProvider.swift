@@ -48,7 +48,9 @@ struct TGCalWidgetProvider: TimelineProvider {
 
         do {
             let data = try Data(contentsOf: fileURL)
-            let snapshot = try JSONDecoder().decode(NextFlightSnapshot.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .secondsSince1970
+            let snapshot = try decoder.decode(NextFlightSnapshot.self, from: data)
 
             // Only show future flights
             guard snapshot.departureDate > Date() else {

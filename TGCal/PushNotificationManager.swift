@@ -41,7 +41,7 @@ final class PushNotificationManager: NSObject, ObservableObject {
     func didRegisterForRemoteNotifications(deviceToken data: Data) {
         let token = data.map { String(format: "%02x", $0) }.joined()
         self.deviceToken = token
-        print("[Push] Device token: \(token)")
+        print("[Push] Device token registered (length: \(token.count))")
 
         // Store token in Supabase
         Task {

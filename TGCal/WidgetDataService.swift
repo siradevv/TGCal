@@ -22,7 +22,9 @@ enum WidgetDataService {
         let fileURL = containerURL.appendingPathComponent(fileName)
 
         do {
-            let data = try JSONEncoder().encode(snapshot)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .secondsSince1970
+            let data = try encoder.encode(snapshot)
             try data.write(to: fileURL, options: .atomic)
         } catch {
             // Widget will show empty state

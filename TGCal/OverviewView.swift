@@ -286,9 +286,10 @@ struct OverviewView: View {
             return 0
         }
 
+        let season: PPBSeason = (month.month >= 4 && month.month <= 10) ? .summer : .winter
         return EarningsCalculator.calculate(
             for: month,
-            season: .summer,
+            season: season,
             tables: rateTables
         ).totalTHB
     }

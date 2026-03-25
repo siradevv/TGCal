@@ -36,15 +36,17 @@ final class SupabaseService: ObservableObject {
         )
 
         if result.user != nil {
-            try await loadProfile()
-            PushNotificationManager.shared.registerTokenAfterLogin()
+            try await completeAuthentication()
         }
     }
 
     func signIn(email: String, password: String) async throws {
         try await client.auth.signIn(email: email, password: password)
-        try await loadProfile()
-        PushNotificationManager.shared.registerTokenAfterLogin()
+        try await completeAuthentication()
+    }
+
+    func resetPassword(email: String) async throws {
+        try await client.auth.resetPasswordForEmail(email)
     }
 
     // MARK: - Social Auth
@@ -115,16 +117,14 @@ final class SupabaseService: ObservableObject {
             }
         }
 
-        try await loadProfile()
-        PushNotificationManager.shared.registerTokenAfterLogin()
+        try await completeAuthentication()
         currentNonce = nil
     }
 
     /// Sign in with Google via Supabase OAuth (opens in-app browser)
     func signInWithGoogle() async throws {
         try await client.auth.signInWithOAuth(.google)
-        try await loadProfile()
-        PushNotificationManager.shared.registerTokenAfterLogin()
+        try await completeAuthentication()
     }
 
     /// Ensure the profile has a display name (for social sign-in where name comes from provider)
@@ -182,8 +182,7 @@ final class SupabaseService: ObservableObject {
         do {
             let session = try await client.auth.session
             if session.user.id.uuidString.isEmpty == false {
-                try await loadProfile()
-                PushNotificationManager.shared.registerTokenAfterLogin()
+                try await completeAuthentication()
             }
         } catch {
             currentUser = nil
@@ -206,6 +205,12 @@ final class SupabaseService: ObservableObject {
 
         currentUser = profile
         isAuthenticated = true
+    }
+
+    /// Shared post-auth logic: load profile and register push token
+    private func completeAuthentication() async throws {
+        try await loadProfile()
+        PushNotificationManager.shared.registerTokenAfterLogin()
     }
 
     func updateProfile(displayName: String, crewRank: CrewRank) async throws {

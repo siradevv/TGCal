@@ -57,7 +57,10 @@ actor CurrencyExchangeService {
             throw URLError(.badURL)
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, urlResponse) = try await URLSession.shared.data(from: url)
+        if let http = urlResponse as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
         let response = try JSONDecoder().decode(ExchangeRateAPIResponse.self, from: data)
         guard response.rates.isEmpty == false else {
             throw URLError(.cannotParseResponse)

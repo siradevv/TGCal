@@ -222,6 +222,14 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $isShowingProfile) {
                 ProfileView()
             }
+            .alert("Error", isPresented: Binding(
+                get: { deleteErrorMessage != nil },
+                set: { if !$0 { deleteErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteErrorMessage ?? "Failed to delete account. Please try again.")
+            }
             .alert("Delete Account", isPresented: $isShowingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
@@ -233,13 +241,15 @@ struct SettingsView: View {
         }
     }
 
+    @State private var deleteErrorMessage: String?
+
     private func performDeleteAccount() async {
         isDeletingAccount = true
         defer { isDeletingAccount = false }
         do {
             try await supabase.deleteAccount()
         } catch {
-            // Silently handle — user will remain signed in if it fails
+            deleteErrorMessage = error.localizedDescription
         }
     }
 

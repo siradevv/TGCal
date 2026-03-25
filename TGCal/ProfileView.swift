@@ -131,7 +131,8 @@ struct ProfileView: View {
             Button("Cancel", role: .cancel) {}
         }
         .onAppear {
-            if let profile = supabase.currentUser {
+            // Only populate form on first appearance, not when returning from child views
+            if displayName.isEmpty, let profile = supabase.currentUser {
                 displayName = profile.displayName
                 crewRank = profile.crewRank
             }

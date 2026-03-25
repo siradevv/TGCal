@@ -135,7 +135,7 @@ struct StyledRosterView: View {
         formatter.calendar = .roster
         formatter.timeZone = rosterTimeZone
         formatter.dateFormat = "MMMM"
-        return "\(formatter.string(from: date))\(year)"
+        return "\(formatter.string(from: date)) \(year)"
     }
 }
 
@@ -156,7 +156,13 @@ struct ActivitySheet: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // Required for iPad to avoid crash
+        if let popover = controller.popoverPresentationController {
+            popover.permittedArrowDirections = .any
+            popover.sourceView = UIView()
+        }
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

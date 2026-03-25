@@ -76,9 +76,11 @@ struct SwapListing: Codable, Identifiable, Equatable {
     var displayDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         guard let date = formatter.date(from: flightDate) else { return flightDate }
         let display = DateFormatter()
         display.dateFormat = "EEE, d MMM yyyy"
+        display.locale = Locale(identifier: "en_US")
         return display.string(from: date)
     }
 }

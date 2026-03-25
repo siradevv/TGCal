@@ -178,7 +178,13 @@ actor AviationstackService {
             serviceDate: serviceDate
         ) {
             let response = try await fetchFlights(apiKey: apiKey, queryItems: attempt.items)
-            if response.error != nil {
+            if let errorCode = response.error?.code?.lowercased() {
+                if errorCode.contains("invalid_access_key") || errorCode.contains("unauthorized") {
+                    throw URLError(.userAuthenticationRequired)
+                }
+                if errorCode.contains("usage_limit") || errorCode.contains("quota") {
+                    throw URLError(.resourceUnavailable)
+                }
                 continue
             }
 
@@ -388,25 +394,26 @@ actor AviationstackService {
         serviceDateFormatter.string(from: date)
     }
 
-    private var serviceDateFormatter: DateFormatter {
+    // Cache formatters to avoid recreating on every call
+    private let serviceDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = .roster
         formatter.timeZone = rosterTimeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
-    }
+    }()
 
-    private var iso8601WithFractional: ISO8601DateFormatter {
+    private let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
-    }
+    }()
 
-    private var iso8601: ISO8601DateFormatter {
+    private let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
-    }
+    }()
 }
 
 private struct AviationstackFlightsResponse: Decodable {

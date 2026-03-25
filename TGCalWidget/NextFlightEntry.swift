@@ -19,6 +19,13 @@ struct NextFlightSnapshot: Codable {
         "\(originCode) \u{2192} \(destinationCode)"
     }
 
+    private static let fallbackDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, d MMM"
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter
+    }()
+
     var relativeDateText: String {
         let calendar = Calendar.current
         if calendar.isDateInToday(departureDate) {
@@ -26,9 +33,7 @@ struct NextFlightSnapshot: Codable {
         } else if calendar.isDateInTomorrow(departureDate) {
             return "Tomorrow"
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEE, d MMM"
-            return formatter.string(from: departureDate)
+            return Self.fallbackDateFormatter.string(from: departureDate)
         }
     }
 

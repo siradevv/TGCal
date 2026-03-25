@@ -97,6 +97,14 @@ struct ChatView: View {
         } message: {
             Text("This will cancel the swap confirmation. The listing will be re-opened.")
         }
+        .alert("Error", isPresented: Binding(
+            get: { swapErrorMessage != nil },
+            set: { if !$0 { swapErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(swapErrorMessage ?? "Something went wrong.")
+        }
         .task {
             await loadData()
         }
@@ -276,20 +284,21 @@ struct ChatView: View {
         }
     }
 
+    @State private var swapErrorMessage: String?
+
     private func confirmSwap() async {
         isConfirming = true
         defer { isConfirming = false }
 
         do {
             try await SwapService.shared.confirmSwap(conversationId: conversation.id)
-            // Send a system-like message
             _ = try? await SwapService.shared.sendMessage(
                 conversationId: conversation.id,
                 text: "\(supabase.currentUser?.displayName ?? "I") confirmed the swap."
             )
             await loadData()
         } catch {
-            // Handle error
+            swapErrorMessage = error.localizedDescription
         }
     }
 
@@ -302,7 +311,7 @@ struct ChatView: View {
             )
             await loadData()
         } catch {
-            // Handle error
+            swapErrorMessage = error.localizedDescription
         }
     }
 }
@@ -344,9 +353,13 @@ struct MessageBubble: View {
         }
     }
 
-    private func timeText(_ date: Date) -> String {
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private func timeText(_ date: Date) -> String {
+        Self.timeFormatter.string(from: date)
     }
 }

@@ -10,6 +10,9 @@ struct AuthView: View {
     @State private var displayName = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showForgotPassword = false
+    @State private var resetEmail = ""
+    @State private var resetSent = false
 
     var body: some View {
         ZStack {
@@ -141,6 +144,18 @@ struct AuthView: View {
                     }
                     .tgOverviewCard(verticalPadding: 20)
 
+                    // Forgot password (only in sign-in mode)
+                    if !isSignUp {
+                        Button {
+                            resetEmail = email
+                            showForgotPassword = true
+                        } label: {
+                            Text("Forgot Password?")
+                                .font(.subheadline)
+                                .foregroundStyle(TGTheme.indigo)
+                        }
+                    }
+
                     // Toggle sign-in / sign-up
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -162,6 +177,29 @@ struct AuthView: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+        .alert("Reset Password", isPresented: $showForgotPassword) {
+            TextField("Email", text: $resetEmail)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+            Button("Send Reset Link") {
+                Task {
+                    do {
+                        try await supabase.resetPassword(email: resetEmail.trimmingCharacters(in: .whitespaces).lowercased())
+                        resetSent = true
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter your email address and we'll send you a password reset link.")
+        }
+        .alert("Check Your Email", isPresented: $resetSent) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("If an account exists for \(resetEmail), a password reset link has been sent.")
         }
     }
 
