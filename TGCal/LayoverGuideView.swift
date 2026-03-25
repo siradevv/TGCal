@@ -447,7 +447,7 @@ struct AddLayoverTipView: View {
     @State private var airportCode = ""
     @State private var selectedCategory: LayoverCategory = .general
     @State private var title = ""
-    @State private var body = ""
+    @State private var tipBody = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
@@ -512,7 +512,7 @@ struct AddLayoverTipView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Details")
                                 .font(.subheadline.weight(.semibold))
-                            TextEditor(text: $body)
+                            TextEditor(text: $tipBody)
                                 .font(.subheadline)
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 100)
@@ -571,7 +571,7 @@ struct AddLayoverTipView: View {
     }
 
     private var isValid: Bool {
-        airportCode.count == 3 && title.isEmpty == false && self.body.isEmpty == false
+        airportCode.count == 3 && title.isEmpty == false && tipBody.isEmpty == false
     }
 
     private func submitTip() async {
@@ -587,7 +587,7 @@ struct AddLayoverTipView: View {
             airportCode: airportCode.uppercased(),
             category: selectedCategory,
             title: title,
-            body: body,
+            body: tipBody,
             authorId: user.id,
             authorName: user.displayName
         )
