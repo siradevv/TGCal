@@ -1,7 +1,9 @@
 import SwiftUI
+import AuthenticationServices
 
 struct AuthView: View {
     @ObservedObject private var supabase = SupabaseService.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isSignUp = false
     @State private var email = ""
     @State private var password = ""
@@ -32,7 +34,61 @@ struct AuthView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    // Form
+                    // Social Sign In
+                    VStack(spacing: 12) {
+                        SignInWithAppleButton(
+                            .signIn,
+                            onRequest: { request in
+                                supabase.prepareAppleSignInRequest(request)
+                            },
+                            onCompletion: { result in
+                                Task { await handleAppleResult(result) }
+                            }
+                        )
+                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        .frame(height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                        Button {
+                            Task { await signInWithGoogle() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "g.circle.fill")
+                                    .font(.title3)
+                                Text("Sign in with Google")
+                                    .font(.headline.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(.systemBackground))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color(.separator), lineWidth: 1)
+                                    )
+                            )
+                            .foregroundStyle(.primary)
+                        }
+                        .disabled(isLoading)
+                    }
+                    .padding(.horizontal, 16)
+
+                    // Divider
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(Color(.separator))
+                            .frame(height: 1)
+                        Text("or")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Rectangle()
+                            .fill(Color(.separator))
+                            .frame(height: 1)
+                    }
+                    .padding(.horizontal, 32)
+
+                    // Email/Password Form
                     VStack(spacing: 14) {
                         if isSignUp {
                             AuthTextField(
@@ -136,6 +192,41 @@ struct AuthView: View {
                     password: password
                 )
             }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func handleAppleResult(_ result: Result<ASAuthorization, Error>) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                errorMessage = "Invalid Apple credential."
+                return
+            }
+            do {
+                try await supabase.handleAppleSignIn(credential: credential)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        case .failure(let error):
+            // User cancelled — don't show error
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func signInWithGoogle() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            try await supabase.signInWithGoogle()
         } catch {
             errorMessage = error.localizedDescription
         }

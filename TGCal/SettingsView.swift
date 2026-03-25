@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("reminders_enabled") private var remindersEnabled = true
     @AppStorage("reminder_12h") private var reminder12h = true
     @AppStorage("reminder_3h") private var reminder3h = true
+    @State private var isShowingDeleteConfirmation = false
+    @State private var isDeletingAccount = false
 
     var body: some View {
         NavigationStack {
@@ -145,6 +147,62 @@ struct SettingsView: View {
                             TGSectionHeader(title: "Support", systemImage: "questionmark.circle")
                                 .textCase(nil)
                         }
+
+                        if supabase.isAuthenticated {
+                            Section {
+                                VStack(spacing: 0) {
+                                    Button {
+                                        Task {
+                                            try? await supabase.signOut()
+                                        }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Text("Sign Out")
+                                                .font(.body.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                            Spacer()
+                                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.vertical, 11)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Divider()
+                                        .overlay(TGTheme.insetStroke.opacity(0.55))
+
+                                    Button {
+                                        isShowingDeleteConfirmation = true
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Text("Delete Account")
+                                                .font(.body.weight(.semibold))
+                                                .foregroundStyle(.red)
+                                            Spacer()
+                                            if isDeletingAccount {
+                                                ProgressView()
+                                                    .tint(.red)
+                                            } else {
+                                                Image(systemName: "trash")
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.red)
+                                            }
+                                        }
+                                        .padding(.vertical, 11)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isDeletingAccount)
+                                }
+                                .tgFrostedCard(cornerRadius: 18, verticalPadding: 8)
+                                .padding(.vertical, 2)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                            } header: {
+                                TGSectionHeader(title: "Account Actions", systemImage: "person.badge.minus")
+                                    .textCase(nil)
+                            }
+                        }
                     }
                     .listStyle(.insetGrouped)
                     .listSectionSpacing(.compact)
@@ -164,6 +222,24 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $isShowingProfile) {
                 ProfileView()
             }
+            .alert("Delete Account", isPresented: $isShowingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    Task { await performDeleteAccount() }
+                }
+            } message: {
+                Text("Are you sure you want to permanently delete your account? This will remove all your data including roster history, swap listings, and messages. This action cannot be undone.")
+            }
+        }
+    }
+
+    private func performDeleteAccount() async {
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        do {
+            try await supabase.deleteAccount()
+        } catch {
+            // Silently handle — user will remain signed in if it fails
         }
     }
 
