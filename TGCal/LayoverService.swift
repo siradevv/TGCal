@@ -28,14 +28,16 @@ final class LayoverService: ObservableObject {
                 .from("layover_tips")
                 .select()
                 .eq("airport_code", value: airportCode.uppercased())
-                .order("upvotes", ascending: false)
-                .limit(100)
 
             if let category {
                 query = query.eq("category", value: category.rawValue)
             }
 
-            tips = try await query.execute().value
+            tips = try await query
+                .order("upvotes", ascending: false)
+                .limit(100)
+                .execute()
+                .value
         } catch {
             // Keep existing tips on failure
         }
@@ -95,7 +97,6 @@ final class LayoverService: ObservableObject {
             .execute()
 
         // Update local count
-        let field = isUpvote ? "upvotes" : "downvotes"
         if let index = tips.firstIndex(where: { $0.id == tipId }) {
             if isUpvote {
                 tips[index].upvotes += 1
