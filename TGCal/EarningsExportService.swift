@@ -22,7 +22,6 @@ struct EarningsExportService {
             context.beginPage()
 
             let margin: CGFloat = 50
-            let contentWidth = pageRect.width - margin * 2
             var y: CGFloat = margin
 
             // ── Title ──────────────────────────────────────────────

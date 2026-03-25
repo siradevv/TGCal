@@ -210,7 +210,7 @@ final class SwapService: ObservableObject {
     }
 
     func cancelSwap(conversationId: UUID) async throws {
-        guard let userId = SupabaseService.shared.currentUser?.id else { return }
+        guard SupabaseService.shared.currentUser?.id != nil else { return }
 
         try await client
             .from("conversations")

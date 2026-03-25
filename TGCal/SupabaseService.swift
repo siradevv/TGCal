@@ -35,9 +35,8 @@ final class SupabaseService: ObservableObject {
             data: ["display_name": .string(displayName)]
         )
 
-        if result.user != nil {
-            try await completeAuthentication()
-        }
+        let _ = result.user
+        try await completeAuthentication()
     }
 
     func signIn(email: String, password: String) async throws {
@@ -123,7 +122,7 @@ final class SupabaseService: ObservableObject {
 
     /// Sign in with Google via Supabase OAuth (opens in-app browser)
     func signInWithGoogle() async throws {
-        try await client.auth.signInWithOAuth(.google)
+        try await client.auth.signInWithOAuth(provider: .google)
         try await completeAuthentication()
     }
 
