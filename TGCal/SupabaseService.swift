@@ -11,8 +11,8 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Configuration
     // Replace with your Supabase project values
-    private static let supabaseURL = URL(string: "https://YOUR_PROJECT.supabase.co")!
-    private static let supabaseAnonKey = "YOUR_ANON_KEY"
+    private static let supabaseURL = URL(string: "https://lbcdmhytzenmjukkgnej.supabase.co")!
+    private static let supabaseAnonKey = "sb_publishable_Zi9KeOLzZuhm0l30ZuyFdw_Lll1PNLK"
 
     let client: SupabaseClient
 
