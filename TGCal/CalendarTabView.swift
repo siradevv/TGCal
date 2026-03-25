@@ -573,13 +573,13 @@ struct CalendarTabView: View {
             let monthId = String(format: "%04d-%02d", parsed.year, parsed.month)
 
             // Convert ScheduleFlightDetail → FlightLookupRecord
-            var comps = DateComponents()
-            comps.year = parsed.year
-            comps.month = parsed.month
-            comps.day = 1
-            comps.calendar = .roster
-            comps.timeZone = rosterTimeZone
-            let placeholderDate = comps.date ?? Date()
+            var dateComps = DateComponents()
+            dateComps.year = parsed.year
+            dateComps.month = parsed.month
+            dateComps.day = 1
+            dateComps.calendar = Calendar.roster
+            dateComps.timeZone = rosterTimeZone
+            let placeholderDate = dateComps.date ?? Date()
 
             var recordDetails: [String: FlightLookupRecord] = [:]
             for (key, detail) in parsed.detailsByFlight {
