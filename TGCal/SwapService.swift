@@ -221,9 +221,13 @@ final class SwapService: ObservableObject {
         guard let conversation = conversations.first(where: { $0.id == conversationId }) else { return }
 
         // Re-open the listing
+        struct ListingReopenPayload: Encodable {
+            let status = "open"
+            let matched_with: String? = nil
+        }
         try await client
             .from("swap_listings")
-            .update(["status": "open", "matched_with": NSNull()])
+            .update(ListingReopenPayload())
             .eq("id", value: conversation.listingId.uuidString)
             .execute()
 
